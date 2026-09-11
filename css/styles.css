@@ -95,7 +95,6 @@
   .sync-btn svg { width: 14px; height: 14px; }
 
   .sync-panel {
-    position: absolute; top: 70px; right: 18px; z-index: 900;
     width: 320px; max-width: calc(100vw - 36px);
     background: var(--card);
     border-radius: 16px;
