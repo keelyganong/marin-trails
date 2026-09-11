@@ -39,6 +39,21 @@ const FALLBACK_INSIGHTS = {
     history: "Muir Woods National Monument was established in 1908, protecting one of the last old-growth coast redwood stands in the Bay Area. The Main Trail's boardwalk loop passes through Cathedral Grove.",
     recentNotes: "Reservations are required for parking or shuttle access. The boardwalk is flat and accessible, making it the most crowded but least strenuous trail in the park.",
     communitySentiment: "Consistently praised for the scale and quiet of the redwoods, with most feedback noting how quickly crowds thin out on the trail's quieter side loops."
+  },
+  'yolanda-hidden-meadow': {
+    history: "The Deer Park trailhead area was long used for grazing and small-scale ranching before becoming part of Marin County's open space network; Yolanda Trail itself is named for a local family associated with the land.",
+    recentNotes: "Starts from the Deer Park Fire Road trailhead in Fairfax. Mostly exposed through open meadow sections, so it can run hot on summer afternoons — shade is concentrated in the oak woodland stretches.",
+    communitySentiment: "Regularly recommended as an easy-to-moderate loop for trail running and dog walking, with runners noting the meadow sections make for a nice change of pace from Marin's more forested trails."
+  },
+  'bon-tempe-loop': {
+    history: "Bon Tempe Lake was completed in 1949 as part of the Marin Municipal Water District's reservoir system on Mount Tamalpais, and sits just downhill from the older Lake Lagunitas.",
+    recentNotes: "Access is via Sky Oaks Road, which has a per-car entrance fee collected by MMWD. The loop is largely shaded by second-growth forest and stays close to the shoreline for most of its length.",
+    communitySentiment: "A popular pick among local trail runners for its relatively flat, shaded loop — often combined with the adjacent Lake Lagunitas loop for a longer run."
+  },
+  'bald-hill': {
+    history: "Bald Hill's open, grassy summit (elevation 1,180 ft) sits above Ross and is preserved as open space partly due to a long local campaign against 1970s-era development plans for the hillside.",
+    recentNotes: "Climbs steadily from Phoenix Lake with little shade, so it's more exposed to sun and wind than most nearby trails — worth an earlier start in summer.",
+    communitySentiment: "Frequently cited as one of the better view-to-effort payoffs near Ross, with hikers calling out the 360-degree summit views over the bay and Mt Tamalpais."
   }
 };
 

@@ -79,6 +79,36 @@
       "blurb": "A flat, paved loop through old-growth redwoods along Redwood Creek — the easiest way to feel the scale of the forest.",
       "distanceType": "loop",
       "extraStats": [["Redwoods", "Feature"]]
+    },
+    {
+      "id": "yolanda-hidden-meadow",
+      "name": "Yolanda Trail to Hidden Meadow Loop",
+      "address": "Porteous Ave, Fairfax, CA 94930",
+      "difficulty": "Moderate",
+      "elevation": "650 ft gain",
+      "blurb": "A rolling loop through oak woodland and open meadow above Fairfax, starting from the Deer Park trailhead — a favorite for trail runners and dog walkers alike.",
+      "distanceType": "loop",
+      "extraStats": [["Deer Park", "Trailhead"]]
+    },
+    {
+      "id": "bon-tempe-loop",
+      "name": "Bon Tempe Loop",
+      "address": "Sky Oaks Rd, Fairfax, CA 94930",
+      "difficulty": "Easy",
+      "elevation": "350 ft gain",
+      "blurb": "A shaded loop around Bon Tempe Lake in the Mt Tam watershed — mostly flat, popular with trail runners, and often combined with neighboring Lake Lagunitas.",
+      "distanceType": "loop",
+      "extraStats": [["MMWD", "Managed by"]]
+    },
+    {
+      "id": "bald-hill",
+      "name": "Bald Hill Loop",
+      "address": "Natalie Coffin Greene Park, Lagunitas Rd, Ross, CA 94957",
+      "difficulty": "Moderate",
+      "elevation": "800 ft gain",
+      "blurb": "A steady climb from Phoenix Lake to Bald Hill's open, grassy summit — wide-open views over Ross Valley and the Bay reward the effort.",
+      "distanceType": "out-and-back",
+      "extraStats": [["1,180 ft", "Summit elevation"]]
     }
   ]
 }

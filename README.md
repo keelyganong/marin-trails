@@ -110,6 +110,18 @@ that segment is a straight bridge rather than a true trace. Distance still
 comes out close to the commonly cited 2.7mi. If you have or can record a
 GPX trace of that segment, it'd be worth hand-splicing in.
 
+The same trade-off applies to a few of the later additions: **Bon Tempe
+Loop** is built the same way as Phoenix Lake (a curated `wayIds` list from
+an Overpass `around` query on the shoreline) and has a couple of similar
+small bridged gaps. **Yolanda Trail to Hidden Meadow Loop** has one longer
+bridge (~0.65mi) — the two trails' real-world junction is apparently
+mid-way along one of the ways rather than at either way's endpoint, and the
+stitching in `build-trail-geometry.pl` only ever joins ways at their
+endpoints, not at interior points — so it bridges between the two nearest
+endpoints instead. Detecting mid-way junctions would need a real graph
+join, not just nearest-endpoint chaining; noted here as a follow-up rather
+than solved.
+
 ## Drag-to-trace: snapping custom routes to the real trail network
 
 Tracing a custom route used to mean tapping a handful of points and getting

@@ -27,6 +27,9 @@ const TRAIL_NAMES = {
   'phoenix-lake': 'Phoenix Lake Loop',
   'old-railroad-grade': 'Old Railroad Grade',
   'muir-woods-main': 'Muir Woods Main Trail',
+  'yolanda-hidden-meadow': 'Yolanda Trail to Hidden Meadow Loop',
+  'bon-tempe-loop': 'Bon Tempe Loop',
+  'bald-hill': 'Bald Hill Loop',
 };
 
 const CACHE_TTL_SECONDS = 24 * 60 * 60; // 1 day

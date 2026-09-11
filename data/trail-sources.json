@@ -72,6 +72,33 @@
       "wayIds": [34684134, 34684608, 502851490, 1494520146],
       "seed": [37.9600, -122.5815],
       "expectedMiles": 2.7
+    },
+    {
+      "id": "yolanda-hidden-meadow",
+      "name": "Yolanda Trail to Hidden Meadow Loop",
+      "mode": "name",
+      "nameRegex": "^(Yolanda Trail|Hidden Meadow Trail)$",
+      "bbox": [37.955, -122.60, 37.975, -122.575],
+      "seed": [37.9650, -122.5946],
+      "expectedMiles": 3.4
+    },
+    {
+      "id": "bon-tempe-loop",
+      "name": "Bon Tempe Loop",
+      "mode": "wayIds",
+      "comment": "No single OSM name covers this loop; these are every path/footway/track way within 60m of the Bon Tempe Lake shoreline (found via an Overpass `around` query, excluding Rocky Ridge Fire Road which only brushes the lake before climbing well away from it), which together trace the perimeter loop.",
+      "wayIds": [234065570, 234065890, 234065891, 35061604, 1491954657, 1491954658, 1491954659, 1281829449, 1281829451, 12172676, 1491954661, 35061846],
+      "seed": [37.9592, -122.6099],
+      "expectedMiles": 3.6
+    },
+    {
+      "id": "bald-hill",
+      "name": "Bald Hill Loop",
+      "mode": "name",
+      "nameRegex": "^Bald Hill Trail$",
+      "bbox": [37.960, -122.60, 37.975, -122.585],
+      "seed": [37.9650, -122.5942],
+      "expectedMiles": 1.4
     }
   ]
 }
