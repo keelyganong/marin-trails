@@ -3,11 +3,17 @@
 
 const favorites = new Set();
 
+// Built-in trailheads are circles; routes you've traced yourself are
+// diamonds — a shape difference reads clearly on the map at marker size,
+// where a subtler cue (just a color or line-weight change) would not.
 function iconSvg(favorited, color, isCustom) {
   const stroke = favorited ? '#C1542E' : color;
   const fill = favorited ? '#C1542E' : (isCustom ? 'none' : '#FBF9F1');
-  const strokeWidth = (isCustom && !favorited) ? 2.4 : 2;
-  return `<svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}"/></svg>`;
+  const strokeWidth = (isCustom && !favorited) ? 2.2 : 2;
+  const shape = isCustom
+    ? `<rect x="3.5" y="3.5" width="9" height="9" rx="1.5" transform="rotate(45 8 8)" fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}"/>`
+    : `<circle cx="8" cy="8" r="6" fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}"/>`;
+  return `<svg viewBox="0 0 16 16" fill="none">${shape}</svg>`;
 }
 
 function heartIcon(active) {

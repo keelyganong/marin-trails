@@ -41,7 +41,11 @@ async function openSidebar(trail) {
   sheetName.textContent = trail.name;
   renderStats(trail);
   renderFavButton(trail);
-  renderHistory(trail); // static — renders immediately, no network call
+  if (trail.isCustom) {
+    renderCustomTrailNotes(trail); // your own local tips — nothing else public exists for it
+  } else {
+    renderHistory(trail); // static — renders immediately, no network call
+  }
   document.getElementById('weatherCard').innerHTML = '<div class="skeleton"></div>';
 
   document.getElementById('sheetEditBtn').style.display = trail.isCustom ? 'flex' : 'none';
@@ -68,7 +72,6 @@ async function openSidebar(trail) {
   if (trail.isCustom) {
     // No public information exists for a route only you've drawn — skip
     // the live call entirely rather than send it somewhere with nothing to find.
-    renderStaticFallbackSections(trail);
     return;
   }
 

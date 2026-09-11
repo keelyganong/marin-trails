@@ -54,6 +54,14 @@ function renderHistory(trail) {
   `;
 }
 
+// Custom routes have no public write-up to show — the one thing worth
+// surfacing here is what you actually wrote about it yourself.
+function renderCustomTrailNotes(trail) {
+  sheetBody.innerHTML = `
+    <div class="sheet-section"><h3>Your notes</h3><p>${trail.blurb}</p></div>
+  `;
+}
+
 function renderLiveSections(data) {
   const recentSection = document.getElementById('recentSection');
   const communitySection = document.getElementById('communitySection');
