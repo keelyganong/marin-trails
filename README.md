@@ -110,6 +110,50 @@ that segment is a straight bridge rather than a true trace. Distance still
 comes out close to the commonly cited 2.7mi. If you have or can record a
 GPX trace of that segment, it'd be worth hand-splicing in.
 
+## Drag-to-trace: snapping custom routes to the real trail network
+
+Tracing a custom route used to mean tapping a handful of points and getting
+straight lines between them — accurate at each tap, but choppy everywhere
+else. Now you can **drag** along a trail and the traced line snaps to and
+follows its real shape, the same way route-builder tools like Strava's or
+CalTopo's work.
+
+- **`data/trail-network.js`** — every trail-type way (footway/path/track/
+  bridleway/steps, named or not — ~5,400 ways) in the Marin/Mt Tam area,
+  simplified from OpenStreetMap and shipped as a flat array of `[lat,lon]`
+  polylines. Built by `scripts/fetch-network-extract.pl` (the Overpass
+  query — broader than `fetch-osm-extract.pl`'s cache, which only pulls
+  *named* ways for the 8 curated trails) piped through
+  `scripts/build-trail-network.pl` (strips tags, thins near-collinear
+  points with a Douglas-Peucker pass — 60% fewer points, same shape).
+  Deliberately excludes roads: an unfiltered query over this bbox returned
+  14,149 ways, and 5,521 of them were `service` roads (driveways,
+  parking-lot lanes) — bulk a hiking app doesn't need.
+
+- **`js/snap-trace.js`** — given a map position, finds the nearest point on
+  that network (a cheap bounding-box prefilter narrows ~5,400 ways down to
+  the handful actually nearby before doing precise pixel-distance checks on
+  their segments), and can walk a way's real vertices between two positions
+  on it.
+
+- **`js/drawing.js`** — drives the actual drag interaction: mousedown starts
+  a trace (snapped if near a trail, freehand otherwise), each mousemove
+  sample either walks forward along the real vertices of the trail you're
+  following, jumps to a new trail if you've crossed onto one, unwinds
+  cleanly if you drag back over ground already traced (no doubled-back
+  spike), or falls back to freehand if you're off any trail. Map
+  drag-to-pan is disabled while tracing, since dragging now means "trace" —
+  zoom with scroll instead. A plain tap (no real movement) still places a
+  single point. Undo removes the whole last drag stroke or tap at once,
+  not one point at a time.
+
+To rebuild the network after OSM coverage changes:
+
+```bash
+perl scripts/fetch-network-extract.pl
+perl scripts/build-trail-network.pl
+```
+
 ## Elevation gain
 
 Built-in trail elevation figures are still the commonly cited public

@@ -1,7 +1,11 @@
 // Add / edit your own traced trails: one guided panel anchored below the
 // "Add trail" button, walking through two phases —
-//   1. tracing: tap the map to place points, with live point count,
-//      distance, and location feedback as you go
+//   1. tracing: DRAG along a trail on the map to trace it — the line snaps
+//      to and follows the real trail network (data/trail-network.js, via
+//      js/snap-trace.js) instead of straight segments between taps. A
+//      plain tap (no real movement) still places a single point, snapped
+//      if it's near a trail. Live point count, distance, and location
+//      update as you go.
 //   2. naming: once tracing is done, the same panel switches to name /
 //      difficulty / local tips, with distance + elevation already filled in
 // Editing an existing custom trail (from the view sidebar's edit button)
@@ -27,20 +31,30 @@ let drawLine = null, drawHalo = null;
 let drawPointMarkers = [];
 let editingTrail = null; // set when the panel is editing an existing custom trail
 
+// Dragging traces a route, so the map's own drag-to-pan has to give way
+// while a trace is in progress — re-enabled the moment draw mode ends.
+const DRAG_SNAP_PX = 22;   // generous "magnetic" radius while actively tracing
+const DRAG_SAMPLE_PX = 5;  // minimum cursor movement between processed samples
+
+let dragTraceActive = false;
+let dragNetworkState = null; // {wayIdx, segIdx, t} once snapped onto a way, else null
+let dragPointMeta = [];      // parallel to drawPoints entries added in the CURRENT gesture
+let lastSamplePixel = null;
+let gestureStarts = []; // drawPoints length before each tap/drag gesture, for Undo
+
+function toLatLonArray(latlng) {
+  return Array.isArray(latlng) ? latlng : [latlng.lat, latlng.lng];
+}
+
 function updateLocationDisplays(text) {
   if (traceLocation) traceLocation.textContent = text;
   const formLocationEl = document.getElementById('formLocation');
   if (formLocationEl) formLocationEl.textContent = text;
 }
 
-function updateTraceHint(snapped) {
-  if (snapped) {
-    traceHintText.textContent = 'Snapped to a nearby trail.';
-    return;
-  }
-  if (drawPoints.length === 0) traceHintText.textContent = 'Tap the map to place your trailhead.';
-  else if (drawPoints.length === 1) traceHintText.textContent = 'Trailhead placed — tap again to add your next point.';
-  else traceHintText.textContent = 'Keep tapping to trace your route, then tap Done.';
+function updateTraceHint() {
+  if (drawPoints.length === 0) traceHintText.textContent = 'Drag along a trail to trace it, or tap to place your trailhead.';
+  else traceHintText.textContent = 'Keep dragging or tapping to extend your route, then tap Done.';
 }
 
 function updateTraceStats() {
@@ -53,73 +67,124 @@ function updateTraceStats() {
 }
 
 function redrawDrawPreview() {
-  if (drawLine) { map.removeLayer(drawLine); map.removeLayer(drawHalo); drawLine = null; drawHalo = null; }
+  // Line layers only make sense with 2+ points — remove them (Undo can
+  // drop the count from many back to 0 or 1) rather than leaving a stale
+  // line from before on the map.
+  if (drawPoints.length <= 1) {
+    if (drawLine) { map.removeLayer(drawLine); map.removeLayer(drawHalo); drawLine = null; drawHalo = null; }
+  } else if (!drawLine) {
+    drawHalo = L.polyline(drawPoints, { color: '#FBF9F1', weight: 6, opacity: 0.9, lineCap: 'round', lineJoin: 'round' }).addTo(map);
+    drawLine = L.polyline(drawPoints, { color: '#C1542E', weight: 3, opacity: 0.95, lineCap: 'round', lineJoin: 'round' }).addTo(map);
+  } else {
+    // Update in place rather than remove+recreate — this runs on every
+    // drag sample, and recreating layers that often visibly stutters.
+    drawHalo.setLatLngs(drawPoints);
+    drawLine.setLatLngs(drawPoints);
+  }
+
+  // Only the trailhead and current end get a marker — a route traced by
+  // dragging can have hundreds of points, and a marker per point would be
+  // both visual noise and slow to redraw continuously.
   drawPointMarkers.forEach(m => map.removeLayer(m));
   drawPointMarkers = [];
   if (drawPoints.length === 0) return;
-
+  drawPointMarkers.push(L.circleMarker(drawPoints[0], {
+    radius: 6, color: '#C1542E', weight: 2, fillColor: '#C1542E', fillOpacity: 1
+  }).addTo(map));
   if (drawPoints.length > 1) {
-    drawHalo = L.polyline(drawPoints, { color: '#FBF9F1', weight: 6, opacity: 0.9, lineCap: 'round', lineJoin: 'round' }).addTo(map);
-    drawLine = L.polyline(drawPoints, { color: '#C1542E', weight: 3, opacity: 0.95, lineCap: 'round', lineJoin: 'round', dashArray: '1,8' }).addTo(map);
+    drawPointMarkers.push(L.circleMarker(drawPoints[drawPoints.length - 1], {
+      radius: 5, color: '#C1542E', weight: 2, fillColor: '#FBF9F1', fillOpacity: 1
+    }).addTo(map));
   }
-  drawPoints.forEach((pt, i) => {
-    const isStart = i === 0;
-    const marker = L.circleMarker(pt, {
-      radius: isStart ? 6 : 4,
-      color: '#C1542E', weight: 2,
-      fillColor: isStart ? '#C1542E' : '#FBF9F1',
-      fillOpacity: 1
-    }).addTo(map);
-    drawPointMarkers.push(marker);
-  });
 }
 
-// ----- Snap new points to nearby existing trails, so a personal route can
-// deliberately follow or branch off a real one -----
-function closestPointOnSegment(p, a, b) {
-  const dx = b.x - a.x, dy = b.y - a.y;
-  const lengthSq = dx * dx + dy * dy;
-  if (lengthSq === 0) return a;
-  let t = ((p.x - a.x) * dx + (p.y - a.y) * dy) / lengthSq;
-  t = Math.max(0, Math.min(1, t));
-  return { x: a.x + t * dx, y: a.y + t * dy };
+// ----- Drag-to-trace: snaps to the real trail network while dragging -----
+function pushTracePoint(pt, meta) {
+  drawPoints.push(toLatLonArray(pt));
+  dragPointMeta.push(meta);
 }
 
-function findSnapPoint(clickLatLng) {
-  const SNAP_PX = 16;
-  const clickPt = map.latLngToContainerPoint(clickLatLng);
-  let best = null;
-  let bestDist = Infinity;
-  trails.forEach(trail => {
-    if (editingTrail && trail.id === editingTrail.id) return;
-    const path = trail.path;
-    for (let i = 1; i < path.length; i++) {
-      const a = map.latLngToContainerPoint(L.latLng(path[i - 1][0], path[i - 1][1]));
-      const b = map.latLngToContainerPoint(L.latLng(path[i][0], path[i][1]));
-      const c = closestPointOnSegment(clickPt, a, b);
-      const dist = Math.hypot(c.x - clickPt.x, c.y - clickPt.y);
-      if (dist < bestDist) { bestDist = dist; best = c; }
-    }
-  });
-  if (best && bestDist <= SNAP_PX) {
-    return { latlng: map.containerPointToLatLng(best), snapped: true };
-  }
-  return { latlng: clickLatLng, snapped: false };
-}
+function handleTraceMouseDown(e) {
+  if (!drawMode) return;
+  dragTraceActive = true;
+  dragPointMeta = [];
+  gestureStarts.push(drawPoints.length);
+  lastSamplePixel = map.latLngToContainerPoint(e.latlng);
 
-function handleDrawClick(e) {
-  const { latlng, snapped } = findSnapPoint(e.latlng);
   const isFirstPoint = drawPoints.length === 0;
-  drawPoints.push([latlng.lat, latlng.lng]);
+  const snap = findNearestNetworkPoint(e.latlng, DRAG_SNAP_PX);
+  if (snap) {
+    pushTracePoint(snap.latlng, { wayIdx: snap.wayIdx, segIdx: snap.segIdx, t: snap.t });
+    dragNetworkState = { wayIdx: snap.wayIdx, segIdx: snap.segIdx, t: snap.t };
+  } else {
+    pushTracePoint(e.latlng, null);
+    dragNetworkState = null;
+  }
+
   redrawDrawPreview();
   updateTraceStats();
-  updateTraceHint(snapped);
-  if (snapped) setTimeout(() => updateTraceHint(false), 1100);
+  updateTraceHint();
   if (isFirstPoint) {
     traceLocation.textContent = 'Locating…';
     fetchRouteLocationLabel(drawPoints[0]);
   }
 }
+
+function handleTraceMouseMove(e) {
+  if (!dragTraceActive) return;
+  const px = map.latLngToContainerPoint(e.latlng);
+  if (lastSamplePixel && Math.hypot(px.x - lastSamplePixel.x, px.y - lastSamplePixel.y) < DRAG_SAMPLE_PX) return;
+  lastSamplePixel = px;
+
+  const snap = findNearestNetworkPoint(e.latlng, DRAG_SNAP_PX);
+
+  if (snap && dragNetworkState && snap.wayIdx === dragNetworkState.wayIdx) {
+    const way = TRAIL_NETWORK[snap.wayIdx];
+    const cmp = comparePos(dragNetworkState.segIdx, dragNetworkState.t, snap.segIdx, snap.t);
+    if (cmp < 0) {
+      // Dragged forward along the same trail — fill in its real vertices.
+      const steps = walkForward(way, snap.wayIdx, dragNetworkState.segIdx, dragNetworkState.t, snap.segIdx, snap.t);
+      steps.forEach(({ pt, meta }) => pushTracePoint(pt, meta));
+      dragNetworkState = { wayIdx: snap.wayIdx, segIdx: snap.segIdx, t: snap.t };
+    } else if (cmp > 0) {
+      // Dragged back over ground already traced this gesture — unwind to
+      // the new position instead of adding a doubled-back spike.
+      while (dragPointMeta.length > 0) {
+        const last = dragPointMeta[dragPointMeta.length - 1];
+        if (!last || last.wayIdx !== snap.wayIdx || comparePos(last.segIdx, last.t, snap.segIdx, snap.t) <= 0) break;
+        dragPointMeta.pop();
+        drawPoints.pop();
+      }
+      pushTracePoint(snap.latlng, { wayIdx: snap.wayIdx, segIdx: snap.segIdx, t: snap.t });
+      dragNetworkState = { wayIdx: snap.wayIdx, segIdx: snap.segIdx, t: snap.t };
+    }
+    // cmp === 0: hasn't moved along the way yet — nothing to add.
+  } else if (snap) {
+    // Landed on a different trail than before (a junction, or the first
+    // snap after being off-network) — a short straight connector is fine.
+    pushTracePoint(snap.latlng, { wayIdx: snap.wayIdx, segIdx: snap.segIdx, t: snap.t });
+    dragNetworkState = { wayIdx: snap.wayIdx, segIdx: snap.segIdx, t: snap.t };
+  } else {
+    // Off any trail — freehand.
+    pushTracePoint(e.latlng, null);
+    dragNetworkState = null;
+  }
+
+  redrawDrawPreview();
+  updateTraceStats();
+}
+
+function handleTraceMouseUp() {
+  if (!dragTraceActive) return;
+  dragTraceActive = false;
+  dragNetworkState = null;
+  dragPointMeta = [];
+  updateTraceHint();
+}
+
+// Safety net: if the button is released off the map (or the tab loses
+// focus mid-drag), don't leave tracing stuck "active".
+document.addEventListener('mouseup', () => { if (dragTraceActive) handleTraceMouseUp(); });
 
 // ----- Panel phase switching -----
 function showTracingPhase() {
@@ -143,27 +208,36 @@ function hideAddTrailPanel() {
 function enterDrawMode() {
   drawMode = true;
   drawPoints = [];
+  gestureStarts = [];
   editingTrail = null;
   addTrailBtn.classList.add('active');
   mapEl.classList.add('drawing-mode');
   showTracingPhase();
   traceLocation.textContent = 'Place your trailhead to see the location';
-  updateTraceHint(false);
+  updateTraceHint();
   updateTraceStats();
   closeSidebar();
-  map.on('click', handleDrawClick);
+  map.dragging.disable(); // dragging now traces a route instead of panning
+  map.on('mousedown', handleTraceMouseDown);
+  map.on('mousemove', handleTraceMouseMove);
+  map.on('mouseup', handleTraceMouseUp);
 }
 
 function exitDrawMode(discard) {
   drawMode = false;
+  dragTraceActive = false;
   addTrailBtn.classList.remove('active');
   mapEl.classList.remove('drawing-mode');
-  map.off('click', handleDrawClick);
+  map.dragging.enable();
+  map.off('mousedown', handleTraceMouseDown);
+  map.off('mousemove', handleTraceMouseMove);
+  map.off('mouseup', handleTraceMouseUp);
   if (discard) {
     if (drawLine) { map.removeLayer(drawLine); map.removeLayer(drawHalo); drawLine = null; drawHalo = null; }
     drawPointMarkers.forEach(m => map.removeLayer(m));
     drawPointMarkers = [];
     drawPoints = [];
+    gestureStarts = [];
   }
 }
 
@@ -178,6 +252,7 @@ function closeAddTrailPanel() {
     drawPointMarkers.forEach(m => map.removeLayer(m));
     drawPointMarkers = [];
     drawPoints = [];
+    gestureStarts = [];
   }
   editingTrail = null;
   hideAddTrailPanel();
@@ -190,11 +265,14 @@ addTrailBtn.addEventListener('click', () => {
 addTrailCloseBtn.addEventListener('click', closeAddTrailPanel);
 
 undoDrawBtn.addEventListener('click', () => {
-  if (drawPoints.length === 0) return;
-  drawPoints.pop();
+  // Undoes the whole last gesture (one drag stroke, or one tap) rather
+  // than a single point — a drag can add many points at once, and popping
+  // just one at a time wouldn't feel like "undo" for that.
+  if (gestureStarts.length === 0) return;
+  drawPoints.length = gestureStarts.pop();
   redrawDrawPreview();
   updateTraceStats();
-  updateTraceHint(false);
+  updateTraceHint();
 });
 
 doneDrawingBtn.addEventListener('click', () => {
