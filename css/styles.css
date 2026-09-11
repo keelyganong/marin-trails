@@ -73,6 +73,54 @@
   }
   .fav-counter svg { width: 14px; height: 14px; }
 
+  .top-right-stack {
+    position: absolute; top: 18px; right: 18px; z-index: 500;
+    display: flex; flex-direction: column; align-items: flex-end; gap: 8px;
+  }
+  .top-right-stack .fav-counter { position: static; }
+
+  .sync-btn {
+    display: flex; align-items: center; gap: 6px;
+    background: var(--card);
+    border: none;
+    border-radius: 999px;
+    padding: 7px 14px;
+    font-family: 'Public Sans', sans-serif;
+    font-size: 12px; font-weight: 700;
+    color: var(--bay);
+    box-shadow: 0 2px 14px rgba(23,31,22,0.15);
+    cursor: pointer;
+  }
+  .sync-btn:hover { background: var(--sand); }
+  .sync-btn svg { width: 14px; height: 14px; }
+
+  .sync-panel {
+    position: absolute; top: 70px; right: 18px; z-index: 900;
+    width: 320px; max-width: calc(100vw - 36px);
+    background: var(--card);
+    border-radius: 16px;
+    box-shadow: 0 6px 24px rgba(23,31,22,0.22);
+  }
+  .sync-code-display {
+    font-family: 'Fraunces', serif;
+    font-size: 22px; font-weight: 600;
+    letter-spacing: 2px;
+    color: var(--forest);
+    background: var(--sand);
+    border-radius: 10px;
+    padding: 14px;
+    text-align: center;
+    margin-bottom: 10px;
+    user-select: all;
+  }
+  .sync-status-msg {
+    font-size: 12px; line-height: 1.4;
+    margin-top: 10px;
+    min-height: 14px;
+  }
+  .sync-status-msg.error { color: var(--poppy); }
+  .sync-status-msg.success { color: var(--forest); }
+
   /* Trailhead marker */
   .trailhead-icon {
     width: 16px; height: 16px;

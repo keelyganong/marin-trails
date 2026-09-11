@@ -1,0 +1,9 @@
+{
+  "name": "marin-trails",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Marin County hiking/running map — static frontend + two small Vercel serverless functions (AI insights proxy, cross-device trail sync).",
+  "dependencies": {
+    "@upstash/redis": "^1.38.4"
+  }
+}

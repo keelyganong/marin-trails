@@ -1,6 +1,9 @@
 // Live AI-generated trail insights (history / recent notes / community
-// sentiment), calling the Anthropic API directly from the browser, with a
-// static fallback (data/fallback-insights.js) if the call fails.
+// sentiment), via /api/anthropic — a small server-side proxy (see
+// api/anthropic.js) that holds the Anthropic API key, since the browser
+// can't call api.anthropic.com directly (no CORS headers for browser
+// origins). Falls back to static content (data/fallback-insights.js) if
+// the call fails.
 
 function renderSkeleton() {
   sheetBody.innerHTML = `
@@ -32,12 +35,11 @@ async function fetchRouteLocationLabel(startPoint) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 12000);
   try {
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
+    const response = await fetch("/api/anthropic", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       signal: controller.signal,
       body: JSON.stringify({
-        model: "claude-sonnet-4-6",
         max_tokens: 60,
         messages: [{ role: "user", content: prompt }],
         tools: [{ type: "web_search_20250305", name: "web_search" }]
@@ -73,12 +75,11 @@ async function fetchInsights(trail) {
 
   let response;
   try {
-    response = await fetch("https://api.anthropic.com/v1/messages", {
+    response = await fetch("/api/anthropic", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       signal: controller.signal,
       body: JSON.stringify({
-        model: "claude-sonnet-4-6",
         max_tokens: 1000,
         messages: [{ role: "user", content: prompt }],
         tools: [{ type: "web_search_20250305", name: "web_search" }]

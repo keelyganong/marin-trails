@@ -43,7 +43,12 @@ data/
 js/                      One file per concern — utils, map-init, popup,
                           trails (rendering + filtering), cameras, weather,
                           insights, elevation, sidebar, drawing (trace-a-route),
-                          storage (localStorage), main (bootstrap)
+                          storage (sync + local cache), sync (sync-code UI),
+                          main (bootstrap)
+
+api/                     Two small Vercel serverless functions (Node) — see
+                          "Backend: AI insights + cross-device sync" below
+package.json             Just the one dependency (@upstash/redis) api/ needs
 
 scripts/                 Perl — the data build pipeline (see below)
 .cache/                  Raw OSM API response cache (gitignored, regenerable)
@@ -119,43 +124,69 @@ roughly every 25m, each point's elevation is looked up via the free
 positive elevation deltas between consecutive samples. If the lookup fails,
 it still honestly falls back to "Not measured" rather than guessing.
 
-## Known limitation: live AI insights need a backend
+## Backend: AI insights + cross-device sync
 
-The trail history/notes/community-sentiment text calls the Anthropic API
-directly from the browser. That worked inside the original chat sandbox
-(which proxied the call), but **a real browser blocks it — the Anthropic
-API doesn't send CORS headers for browser origins**, and it shouldn't: that
-would mean shipping an API key to every visitor's browser. Verified while
-testing this rebuild:
+Two things need more than a static file host: live AI trail insights, and
+syncing custom routes across your own devices. Both need a server holding a
+secret (an API key; a database credential), which a static site can't do.
+This app is deployed on **Vercel**, which serves the static files *and* runs
+two small serverless functions from `api/`:
 
-```
-Access to fetch at 'https://api.anthropic.com/v1/messages' from origin
-'http://localhost:4173' has been blocked by CORS policy
-```
+- **`api/anthropic.js`** — proxies calls to the Anthropic API. The trail
+  history/notes/community-sentiment text originally called
+  `api.anthropic.com` directly from the browser, which worked inside the
+  original chat sandbox (which proxied the call) but **is blocked by CORS in
+  a real browser** — confirmed while testing this rebuild:
+  ```
+  Access to fetch at 'https://api.anthropic.com/v1/messages' from origin
+  'http://localhost:4173' has been blocked by CORS policy
+  ```
+  Anthropic doesn't send CORS headers for browser origins, by design — that
+  would mean shipping an API key to every visitor. This function holds the
+  key server-side instead. It's a public, keyless endpoint, so it also pins
+  the model, caps `max_tokens`, and rate-limits per IP (30/hour) to bound
+  worst-case cost if it gets hit outside the app. `js/insights.js` calls
+  `/api/anthropic` instead of `api.anthropic.com` directly. Falls back to
+  `data/fallback-insights.js` if the call still fails for any reason.
 
-The app already degrades gracefully — it falls back to the static
-`data/fallback-insights.js` write-ups — but the "live" part of "live
-AI-generated insights" doesn't currently work outside the sandbox. Fixing
-this for real needs a small backend/serverless proxy (a Cloudflare Worker,
-Vercel/Netlify function, or similar) that holds the API key server-side and
-forwards the request; `js/insights.js` would then call that proxy's URL
-instead of `api.anthropic.com` directly. Not yet built — flagging it here
-since it's a real gap between "works in the demo" and "works deployed."
+- **`api/trails.js`** — stores custom traced trails so they follow you
+  across your own devices, keyed by a private "sync code" (`js/storage.js`,
+  `js/sync.js`). Not a real account system: on first save, the app generates
+  a random 10-character code and shows it once (the "Sync" button, top
+  right); entering that same code on another device pulls the same trails.
+  Anyone with the code can read/overwrite that data — same trust model as a
+  house key, so treat it like one. Trails still aren't visible to *other*
+  people, only synced across devices you personally link with the same
+  code. Storage is Upstash Redis (see setup below); if it isn't configured
+  yet, this endpoint returns a clear 503 and the app falls back to
+  `localStorage`-only (works, just single-device).
 
 NWS weather (`js/weather.js`) has no such issue — `api.weather.gov` does
-support browser CORS and was confirmed working during testing.
+support browser CORS directly, confirmed working during testing.
 
-## Deploying
+### Deploying / setting this up on Vercel
 
-This is a static site with one caveat: the Anthropic insights call (see
-above) won't work until it's routed through a backend proxy. Everything
-else — trails, weather, elevation, camera markers, custom routes — works
-as static files on any static host (GitHub Pages, Netlify, Vercel,
-Cloudflare Pages, S3+CloudFront, etc.): push `index.html`, `css/`, `js/`,
-and `data/` (skip `scripts/` and `.cache/`, which are build-time only).
+1. **Import the repo.** [vercel.com/new](https://vercel.com/new) → import
+   this GitHub repo. No build settings needed — it's detected as a static
+   project with serverless functions in `api/`.
 
-## Custom route storage
+2. **Add the Anthropic key.** Project Settings → Environment Variables →
+   add `ANTHROPIC_API_KEY` with your key. Redeploy after adding it (env var
+   changes need a redeploy to take effect).
 
-Custom traced routes persist via `localStorage` (per-browser, not synced
-anywhere). The original prototype used a sandbox-only `window.storage` API
-that doesn't exist in a real browser — swapped out for `localStorage` here.
+3. **Add Redis for trail sync.** Project → Storage tab → Browse Marketplace
+   → "Upstash for Redis" (this replaced the old "Vercel KV" product in
+   December 2024 — search for Upstash if you don't see KV listed) → create
+   a database and connect it to this project. Vercel auto-injects the
+   `KV_REST_API_URL`/`KV_REST_API_TOKEN` (or `UPSTASH_REDIS_REST_URL`/
+   `UPSTASH_REDIS_REST_TOKEN`) env vars that `api/trails.js` reads via
+   `Redis.fromEnv()` — no manual copying needed.
+
+4. **Redeploy** once both are set. That's it — every future `git push` to
+   `main` auto-deploys.
+
+If you'd rather skip the backend entirely, everything except live AI
+insights and cross-device sync still works as a plain static site on any
+static host (GitHub Pages, Netlify, Cloudflare Pages, S3+CloudFront) — just
+serve `index.html`, `css/`, `js/`, and `data/` (skip `api/`, `scripts/`,
+`package.json`, and `.cache/`, which are backend/build-time only).
