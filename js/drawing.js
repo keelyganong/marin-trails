@@ -1,27 +1,55 @@
-// Add / edit your own traced trails: draw mode, snap-to-existing-trail, and
-// the create/edit form (which shares the sidebar element with sidebar.js).
+// Add / edit your own traced trails: one guided panel anchored below the
+// "Add trail" button, walking through two phases —
+//   1. tracing: tap the map to place points, with live point count,
+//      distance, and location feedback as you go
+//   2. naming: once tracing is done, the same panel switches to name /
+//      difficulty / local tips, with distance + elevation already filled in
+// Editing an existing custom trail (from the view sidebar's edit button)
+// jumps straight to phase 2, pre-filled.
 
 const addTrailBtn = document.getElementById('addTrailBtn');
-const drawBanner = document.getElementById('drawBanner');
-const drawBannerText = document.getElementById('drawBannerText');
-const doneDrawingBtn = document.getElementById('doneDrawingBtn');
+const addTrailPanel = document.getElementById('addTrailPanel');
+const addTrailTitle = document.getElementById('addTrailTitle');
+const addTrailCloseBtn = document.getElementById('addTrailCloseBtn');
+const addTrailTracing = document.getElementById('addTrailTracing');
+const addTrailForm = document.getElementById('addTrailForm');
+const traceHintText = document.getElementById('traceHintText');
+const tracePointCount = document.getElementById('tracePointCount');
+const traceDistance = document.getElementById('traceDistance');
+const traceLocation = document.getElementById('traceLocation');
 const undoDrawBtn = document.getElementById('undoDrawBtn');
+const doneDrawingBtn = document.getElementById('doneDrawingBtn');
 const mapEl = document.getElementById('map');
 
 let drawMode = false;
 let drawPoints = [];
 let drawLine = null, drawHalo = null;
 let drawPointMarkers = [];
-let editingTrail = null; // set when the form is editing an existing custom trail
+let editingTrail = null; // set when the panel is editing an existing custom trail
 
-function updateDrawBannerText(snapped) {
+function updateLocationDisplays(text) {
+  if (traceLocation) traceLocation.textContent = text;
+  const formLocationEl = document.getElementById('formLocation');
+  if (formLocationEl) formLocationEl.textContent = text;
+}
+
+function updateTraceHint(snapped) {
   if (snapped) {
-    drawBannerText.textContent = 'Snapped to a nearby trail.';
+    traceHintText.textContent = 'Snapped to a nearby trail.';
     return;
   }
-  if (drawPoints.length === 0) drawBannerText.textContent = 'Tap the map to place your trailhead.';
-  else if (drawPoints.length === 1) drawBannerText.textContent = 'Trailhead placed — tap again to add your next point.';
-  else drawBannerText.textContent = 'Keep tapping to trace your route, or tap Done when finished.';
+  if (drawPoints.length === 0) traceHintText.textContent = 'Tap the map to place your trailhead.';
+  else if (drawPoints.length === 1) traceHintText.textContent = 'Trailhead placed — tap again to add your next point.';
+  else traceHintText.textContent = 'Keep tapping to trace your route, then tap Done.';
+}
+
+function updateTraceStats() {
+  tracePointCount.textContent = drawPoints.length;
+  traceDistance.textContent = `${pathDistanceMiles(drawPoints).toFixed(1)} mi`;
+  const ready = drawPoints.length >= 2;
+  doneDrawingBtn.style.opacity = ready ? '1' : '0.4';
+  doneDrawingBtn.style.pointerEvents = ready ? 'auto' : 'none';
+  undoDrawBtn.style.display = drawPoints.length >= 1 ? 'block' : 'none';
 }
 
 function redrawDrawPreview() {
@@ -81,24 +109,48 @@ function findSnapPoint(clickLatLng) {
 
 function handleDrawClick(e) {
   const { latlng, snapped } = findSnapPoint(e.latlng);
+  const isFirstPoint = drawPoints.length === 0;
   drawPoints.push([latlng.lat, latlng.lng]);
   redrawDrawPreview();
-  if (drawPoints.length >= 2) doneDrawingBtn.classList.add('visible');
-  if (drawPoints.length >= 1) undoDrawBtn.style.display = 'inline-block';
-  updateDrawBannerText(snapped);
-  if (snapped) setTimeout(() => updateDrawBannerText(false), 1100);
+  updateTraceStats();
+  updateTraceHint(snapped);
+  if (snapped) setTimeout(() => updateTraceHint(false), 1100);
+  if (isFirstPoint) {
+    traceLocation.textContent = 'Locating…';
+    fetchRouteLocationLabel(drawPoints[0]);
+  }
+}
+
+// ----- Panel phase switching -----
+function showTracingPhase() {
+  addTrailPanel.hidden = false;
+  addTrailTracing.hidden = false;
+  addTrailForm.hidden = true;
+  addTrailTitle.textContent = 'Trace your route';
+}
+
+function showFormPhase(existingTrail) {
+  addTrailPanel.hidden = false;
+  addTrailTracing.hidden = true;
+  addTrailForm.hidden = false;
+  addTrailTitle.textContent = existingTrail ? 'Edit route' : 'Name your route';
+}
+
+function hideAddTrailPanel() {
+  addTrailPanel.hidden = true;
 }
 
 function enterDrawMode() {
   drawMode = true;
   drawPoints = [];
+  editingTrail = null;
   addTrailBtn.classList.add('active');
   mapEl.classList.add('drawing-mode');
-  drawBanner.classList.add('visible');
-  doneDrawingBtn.classList.remove('visible');
-  undoDrawBtn.style.display = 'none';
-  updateDrawBannerText(false);
-  closeSidebarForce();
+  showTracingPhase();
+  traceLocation.textContent = 'Place your trailhead to see the location';
+  updateTraceHint(false);
+  updateTraceStats();
+  closeSidebar();
   map.on('click', handleDrawClick);
 }
 
@@ -106,8 +158,6 @@ function exitDrawMode(discard) {
   drawMode = false;
   addTrailBtn.classList.remove('active');
   mapEl.classList.remove('drawing-mode');
-  drawBanner.classList.remove('visible');
-  doneDrawingBtn.classList.remove('visible');
   map.off('click', handleDrawClick);
   if (discard) {
     if (drawLine) { map.removeLayer(drawLine); map.removeLayer(drawHalo); drawLine = null; drawHalo = null; }
@@ -117,40 +167,55 @@ function exitDrawMode(discard) {
   }
 }
 
+// The single × on the panel means "leave this flow" — what that discards
+// depends on where you are: mid-trace or naming a brand-new route both
+// throw away the unsaved points; editing an existing route just closes.
+function closeAddTrailPanel() {
+  if (drawMode) {
+    exitDrawMode(true);
+  } else if (!addTrailForm.hidden && !editingTrail) {
+    if (drawLine) { map.removeLayer(drawLine); map.removeLayer(drawHalo); drawLine = null; drawHalo = null; }
+    drawPointMarkers.forEach(m => map.removeLayer(m));
+    drawPointMarkers = [];
+    drawPoints = [];
+  }
+  editingTrail = null;
+  hideAddTrailPanel();
+}
+
 addTrailBtn.addEventListener('click', () => {
-  if (drawMode) { exitDrawMode(true); return; }
+  if (!addTrailPanel.hidden) { closeAddTrailPanel(); return; }
   enterDrawMode();
 });
-document.getElementById('cancelDrawBtn').addEventListener('click', () => exitDrawMode(true));
+addTrailCloseBtn.addEventListener('click', closeAddTrailPanel);
+
 undoDrawBtn.addEventListener('click', () => {
   if (drawPoints.length === 0) return;
   drawPoints.pop();
   redrawDrawPreview();
-  if (drawPoints.length < 2) doneDrawingBtn.classList.remove('visible');
-  if (drawPoints.length === 0) undoDrawBtn.style.display = 'none';
-  updateDrawBannerText(false);
+  updateTraceStats();
+  updateTraceHint(false);
 });
 
 doneDrawingBtn.addEventListener('click', () => {
+  if (drawPoints.length < 2) return;
   exitDrawMode(false); // keep the drawn points/preview visible while naming
   editingTrail = null;
-  fetchRouteLocationLabel(drawPoints[0]);
   openTrailForm(drawPoints);
   fetchElevationGain(drawPoints).then(gainFeet => {
     if (gainFeet == null) return;
     pendingElevationGainFeet = gainFeet;
-    if (sidebarForm.classList.contains('active') && !editingTrail) {
-      document.getElementById('formElevation').textContent = `${gainFeet.toLocaleString()} ft gain`;
+    if (!addTrailForm.hidden && !editingTrail) {
+      formElevationStat.textContent = `${gainFeet.toLocaleString()} ft`;
     }
   });
 });
 
-
-// ----- Create/edit form -----
+// ----- Name / edit form (phase 2) -----
 const formName = document.getElementById('formName');
 const formBlurb = document.getElementById('formBlurb');
-const formDistance = document.getElementById('formDistance');
-const formTitle = document.getElementById('formTitle');
+const formDistanceStat = document.getElementById('formDistanceStat');
+const formElevationStat = document.getElementById('formElevationStat');
 const difficultyPicker = document.getElementById('difficultyPicker');
 const formDeleteWrap = document.getElementById('formDeleteWrap');
 let selectedDifficulty = null;
@@ -165,44 +230,32 @@ difficultyPicker.querySelectorAll('.diff-swatch').forEach(btn => {
 });
 
 function openTrailForm(points, existingTrail) {
-  sidebarView.classList.add('hidden');
-  sidebarForm.classList.add('active');
-  sidebar.classList.add('open');
+  showFormPhase(existingTrail);
 
   const dist = pathDistanceMiles(points);
-  formDistance.textContent = `${dist.toFixed(1)} mi traced`;
+  formDistanceStat.textContent = `${dist.toFixed(1)} mi`;
 
   difficultyPicker.querySelectorAll('.diff-swatch').forEach(b => b.classList.remove('selected'));
   selectedDifficulty = null;
   pendingElevationGainFeet = null;
 
   if (existingTrail) {
-    formTitle.textContent = 'Edit route';
     formName.value = existingTrail.name;
     formBlurb.value = existingTrail.blurb || '';
     const match = difficultyPicker.querySelector(`[data-difficulty="${existingTrail.difficulty}"]`);
     if (match) { match.classList.add('selected'); selectedDifficulty = existingTrail.difficulty; }
     formDeleteWrap.style.display = 'block';
-    document.getElementById('formLocation').textContent = existingTrail.address || 'Marin County, CA';
-    document.getElementById('formElevation').textContent = existingTrail.elevation || 'Calculating elevation…';
+    updateLocationDisplays(existingTrail.address || 'Marin County, CA');
+    formElevationStat.textContent = existingTrail.elevation || '…';
   } else {
-    formTitle.textContent = 'Name your route';
     formName.value = '';
     formBlurb.value = '';
     formDeleteWrap.style.display = 'none';
-    document.getElementById('formLocation').textContent = 'Locating…';
-    document.getElementById('formElevation').textContent = 'Calculating elevation…';
+    updateLocationDisplays(pendingLocationLabel || 'Locating…');
+    formElevationStat.textContent = 'Calculating…';
   }
   formName.focus();
 }
-
-document.getElementById('formCloseBtn').addEventListener('click', () => {
-  sidebarForm.classList.remove('active');
-  sidebarView.classList.remove('hidden');
-  sidebar.classList.remove('open');
-  if (!editingTrail) exitDrawMode(true); // discard an unsaved new route
-  editingTrail = null;
-});
 
 document.getElementById('formSaveBtn').addEventListener('click', () => {
   const name = formName.value.trim();
@@ -230,10 +283,10 @@ document.getElementById('formSaveBtn').addEventListener('click', () => {
     trailLayers[editingTrail.id].lines.forEach(l => l.setStyle({ color: editingTrail.color }));
     refreshFavoriteVisuals(editingTrail.id);
     saveCustomTrailsToStorage();
-    closeSidebarForce();
-    sidebarView.classList.remove('hidden');
-    openSidebar(editingTrail);
+    const savedTrail = editingTrail;
     editingTrail = null;
+    hideAddTrailPanel();
+    openSidebar(savedTrail);
     return;
   }
 
@@ -268,14 +321,14 @@ document.getElementById('formSaveBtn').addEventListener('click', () => {
   applyDifficultyFilter();
   saveCustomTrailsToStorage();
 
-  sidebarForm.classList.remove('active');
-  sidebarView.classList.remove('hidden');
   drawPoints = [];
+  hideAddTrailPanel();
   openSidebar(newTrail);
 });
 
 document.getElementById('sheetEditBtn').addEventListener('click', () => {
   if (!currentTrail || !currentTrail.isCustom) return;
+  closeSidebar();
   editingTrail = currentTrail;
   openTrailForm(currentTrail.path, currentTrail);
 });
@@ -296,6 +349,5 @@ document.getElementById('formDeleteBtn').addEventListener('click', () => {
   saveCustomTrailsToStorage();
   updateFavCounter();
   editingTrail = null;
-  closeSidebarForce();
-  sidebarView.classList.remove('hidden');
+  hideAddTrailPanel();
 });

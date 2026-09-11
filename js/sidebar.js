@@ -1,10 +1,8 @@
 // Left sidebar: trail detail view (stats, weather, AI insights, favoriting).
-// See js/drawing.js for the sibling create/edit route form that shares this
-// same sidebar element.
+// The create/edit route form lives in its own panel — see js/drawing.js.
 
 const sidebar = document.getElementById('sidebar');
 const sidebarView = document.getElementById('sidebarView');
-const sidebarForm = document.getElementById('sidebarForm');
 const sheetName = document.getElementById('sheetName');
 const sheetStats = document.getElementById('sheetStats');
 const sheetBody = document.getElementById('sheetBody');
@@ -16,12 +14,6 @@ document.getElementById('sheetClose').addEventListener('click', closeSidebar);
 map.on('click', () => closeSidebar());
 
 function closeSidebar() {
-  if (sidebarForm.classList.contains('active')) return; // don't dismiss an in-progress form via a stray map click
-  sidebar.classList.remove('open');
-}
-
-function closeSidebarForce() {
-  sidebarForm.classList.remove('active');
   sidebar.classList.remove('open');
 }
 
@@ -46,8 +38,6 @@ sheetFavBtn.addEventListener('click', () => {
 
 async function openSidebar(trail) {
   currentTrail = trail;
-  sidebarForm.classList.remove('active');
-  sidebarView.classList.remove('hidden');
   sheetName.textContent = trail.name;
   renderStats(trail);
   renderFavButton(trail);

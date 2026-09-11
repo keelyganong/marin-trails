@@ -19,8 +19,13 @@
 
   .leaflet-tile-pane { filter: saturate(0.85) sepia(0.08); }
 
-  .brand {
+  .top-left-stack {
     position: absolute; top: 18px; left: 18px; z-index: 500;
+    display: flex; flex-direction: column; align-items: flex-start; gap: 10px;
+  }
+  .top-left-stack .brand { position: static; }
+
+  .brand {
     background: var(--card);
     border-radius: 14px;
     padding: 10px 18px;
@@ -391,48 +396,20 @@
   .add-trail-btn svg { width: 14px; height: 14px; }
   .add-trail-btn.active { color: var(--poppy); }
 
-  .draw-banner {
-    position: absolute; top: 18px; left: 50%; transform: translateX(-50%) translateY(-140%);
-    z-index: 600;
-    background: var(--forest); color: var(--card);
-    border-radius: 999px;
-    padding: 10px 10px 10px 18px;
-    display: flex; align-items: center; gap: 12px;
-    font-size: 12.5px; font-weight: 600;
-    box-shadow: 0 6px 20px rgba(23,31,22,0.3);
-    transition: transform 0.28s ease;
-    max-width: 90vw;
-  }
-  .draw-banner.visible { transform: translateX(-50%) translateY(0); }
-  .draw-banner button {
-    background: rgba(251,249,241,0.15);
-    border: none; color: var(--card);
-    font-size: 11.5px; font-weight: 700;
-    padding: 6px 12px; border-radius: 999px;
-    cursor: pointer; flex-shrink: 0;
-  }
-  .draw-banner button:hover { background: rgba(251,249,241,0.28); }
-
-  .done-drawing-btn {
-    position: absolute; bottom: 28px; left: 50%; transform: translateX(-50%) translateY(200%);
-    z-index: 600;
-    background: var(--poppy); color: var(--card);
-    border: none; border-radius: 999px;
-    padding: 12px 22px;
-    font-family: 'Public Sans', sans-serif;
-    font-size: 13px; font-weight: 700;
-    box-shadow: 0 6px 20px rgba(193,84,46,0.4);
-    cursor: pointer;
-    transition: transform 0.28s ease;
-  }
-  .done-drawing-btn.visible { transform: translateX(-50%) translateY(0); }
-
   #map.drawing-mode { cursor: crosshair; }
 
-  /* Sidebar create/edit form */
-  .sidebar-form { display: none; flex-direction: column; height: 100%; }
-  .sidebar-form.active { display: flex; }
-  .sidebar-view.hidden { display: none; }
+  /* Guided add-trail panel: tracing phase, then name/save form phase */
+  .add-trail-panel {
+    width: 340px; max-width: calc(100vw - 36px);
+    max-height: calc(100vh - 160px);
+    overflow-y: auto;
+    background: var(--card);
+    border-radius: 16px;
+    box-shadow: 0 6px 24px rgba(23,31,22,0.22);
+  }
+  .add-trail-panel .sheet-header { padding: 18px 22px 14px; border-bottom: none; }
+  .add-trail-panel .sheet-stats { padding: 0; border-bottom: none; }
+  .add-trail-panel .stat { min-width: 0; flex: 1; }
 
   .form-field { margin-bottom: 18px; }
   .form-field label {

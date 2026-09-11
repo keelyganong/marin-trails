@@ -123,18 +123,12 @@ async function fetchRouteLocationLabel(startPoint) {
     const text = data.content.filter(b => b.type === "text").map(b => b.text).join(" ").trim();
     if (text) {
       pendingLocationLabel = text.replace(/^["']|["']$/g, '').slice(0, 80);
-      const formLocationEl = document.getElementById('formLocation');
-      if (formLocationEl && sidebarForm.classList.contains('active')) {
-        formLocationEl.textContent = pendingLocationLabel;
-      }
+      updateLocationDisplays(pendingLocationLabel);
     }
   } catch (err) {
     console.warn('Route location lookup failed, using generic fallback:', err);
     pendingLocationLabel = 'Marin County, CA';
-    const formLocationEl = document.getElementById('formLocation');
-    if (formLocationEl && sidebarForm.classList.contains('active')) {
-      formLocationEl.textContent = pendingLocationLabel;
-    }
+    updateLocationDisplays(pendingLocationLabel);
   } finally {
     clearTimeout(timeout);
   }

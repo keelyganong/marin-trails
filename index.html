@@ -12,27 +12,75 @@
 
 <div id="map"></div>
 
-<div class="brand">
-  <h1>your map</h1>
-  <p>Marin County · runs & hikes</p>
-  <div class="legend" id="legend">
-    <span class="legend-item active" data-difficulty="Easy"><i style="background:#7C8F6E"></i>Easy</span>
-    <span class="legend-item active" data-difficulty="Moderate"><i style="background:#3D6C82"></i>Moderate</span>
-    <span class="legend-item active" data-difficulty="Strenuous"><i style="background:#24382C"></i>Strenuous</span>
+<div class="top-left-stack">
+  <div class="brand">
+    <h1>your map</h1>
+    <p>Marin County · runs & hikes</p>
+    <div class="legend" id="legend">
+      <span class="legend-item active" data-difficulty="Easy"><i style="background:#7C8F6E"></i>Easy</span>
+      <span class="legend-item active" data-difficulty="Moderate"><i style="background:#3D6C82"></i>Moderate</span>
+      <span class="legend-item active" data-difficulty="Strenuous"><i style="background:#24382C"></i>Strenuous</span>
+    </div>
+    <button class="add-trail-btn" id="addTrailBtn" title="Trace and save your own route">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      Add trail
+    </button>
   </div>
-  <button class="add-trail-btn" id="addTrailBtn" title="Add a trail">
-    <svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-    Add trail
-  </button>
-</div>
 
-<div class="draw-banner" id="drawBanner">
-  <span id="drawBannerText">Tap the map to place your trailhead.</span>
-  <button id="undoDrawBtn" style="display:none;">Undo</button>
-  <button id="cancelDrawBtn">Cancel</button>
-</div>
+  <div class="add-trail-panel" id="addTrailPanel" hidden>
+    <div class="sheet-header" style="padding:18px 22px 14px;">
+      <h2 id="addTrailTitle" style="font-size:18px; margin:0;">Trace your route</h2>
+      <button class="sheet-close" id="addTrailCloseBtn">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="#171F16" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+    </div>
 
-<button class="done-drawing-btn" id="doneDrawingBtn">Done — name this route</button>
+    <div id="addTrailTracing" style="padding:0 22px 20px;">
+      <p class="loc" id="traceHintText" style="margin:0 0 14px;">Tap the map to place your trailhead.</p>
+      <div class="sheet-stats" style="padding:0;">
+        <div class="stat"><div class="num" id="tracePointCount">0</div><div class="lbl">Points</div></div>
+        <div class="stat"><div class="num" id="traceDistance">0.0 mi</div><div class="lbl">Distance</div></div>
+      </div>
+      <div class="loc" id="traceLocation" style="margin:12px 0 18px;">Place your trailhead to see the location</div>
+      <div style="display:flex; gap:8px;">
+        <button type="button" class="form-delete-btn" id="undoDrawBtn" style="flex:1; display:none;">Undo</button>
+        <button type="button" class="btn-viewmore" id="doneDrawingBtn" style="flex:1; background:var(--forest); opacity:0.4; pointer-events:none;">Done tracing</button>
+      </div>
+    </div>
+
+    <div id="addTrailForm" hidden>
+      <div class="sheet-body" style="padding-top:2px;">
+        <div class="sheet-stats" style="padding:0 0 14px;">
+          <div class="stat"><div class="num" id="formDistanceStat">0.0 mi</div><div class="lbl">Distance</div></div>
+          <div class="stat"><div class="num" id="formElevationStat">…</div><div class="lbl">Elevation</div></div>
+        </div>
+        <div class="loc" id="formLocation" style="margin-bottom:16px;">Locating…</div>
+        <div class="form-field">
+          <label>Name</label>
+          <input type="text" id="formName" placeholder="e.g. My morning loop" maxlength="60">
+        </div>
+        <div class="form-field">
+          <label>Difficulty</label>
+          <div class="difficulty-picker" id="difficultyPicker">
+            <button type="button" class="diff-swatch" data-difficulty="Easy" style="--swatch:#7C8F6E">Easy</button>
+            <button type="button" class="diff-swatch" data-difficulty="Moderate" style="--swatch:#3D6C82">Moderate</button>
+            <button type="button" class="diff-swatch" data-difficulty="Strenuous" style="--swatch:#24382C">Strenuous</button>
+          </div>
+        </div>
+        <div class="form-field">
+          <label>Local tips (optional)</label>
+          <textarea id="formBlurb" rows="3" maxlength="160" placeholder="What makes this route worth coming back to?"></textarea>
+        </div>
+        <div class="form-field" id="formDeleteWrap" style="display:none;">
+          <button type="button" class="form-delete-btn" id="formDeleteBtn">Delete this route</button>
+        </div>
+      </div>
+      <div class="sheet-footer">
+        <button class="btn-viewmore" id="formSaveBtn" style="width:100%; background:var(--forest);">Save route</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <div class="top-right-stack">
   <div class="fav-counter" id="favCounter">
@@ -121,44 +169,6 @@
         <svg viewBox="0 0 24 24" fill="none"><path d="M12 21s-7.5-4.6-10-9.2C.4 8.5 2 4.8 5.6 4.1c2-.4 4 .5 5.1 2.2C11.8 4.6 13.8 3.7 15.8 4.1c3.6.7 5.2 4.4 3.6 7.7C16.9 16.4 12 21 12 21z" stroke="currentColor" stroke-width="1.6"/></svg>
         <span id="favBtnLabel">Save route</span>
       </button>
-    </div>
-  </div>
-
-  <div class="sidebar-form" id="sidebarForm">
-    <div class="sheet-header">
-      <div>
-        <h2 id="formTitle">Name your route</h2>
-        <div class="loc" id="formDistance">0.0 mi traced</div>
-        <div class="loc" id="formElevation" style="margin-top:2px;">Calculating elevation…</div>
-        <div class="loc" id="formLocation" style="margin-top:2px;">Locating…</div>
-      </div>
-      <button class="sheet-close" id="formCloseBtn">
-        <svg viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="#171F16" stroke-width="2" stroke-linecap="round"/></svg>
-      </button>
-    </div>
-    <div class="sheet-body">
-      <div class="form-field">
-        <label>Name</label>
-        <input type="text" id="formName" placeholder="e.g. My morning loop" maxlength="60">
-      </div>
-      <div class="form-field">
-        <label>Difficulty</label>
-        <div class="difficulty-picker" id="difficultyPicker">
-          <button type="button" class="diff-swatch" data-difficulty="Easy" style="--swatch:#7C8F6E">Easy</button>
-          <button type="button" class="diff-swatch" data-difficulty="Moderate" style="--swatch:#3D6C82">Moderate</button>
-          <button type="button" class="diff-swatch" data-difficulty="Strenuous" style="--swatch:#24382C">Strenuous</button>
-        </div>
-      </div>
-      <div class="form-field">
-        <label>Notes (optional)</label>
-        <textarea id="formBlurb" rows="3" maxlength="160" placeholder="What makes this route worth coming back to?"></textarea>
-      </div>
-      <div class="form-field" id="formDeleteWrap" style="display:none;">
-        <button type="button" class="form-delete-btn" id="formDeleteBtn">Delete this route</button>
-      </div>
-    </div>
-    <div class="sheet-footer">
-      <button class="btn-fav-large active" id="formSaveBtn" style="border-color:#24382C; background:#24382C;">Save route</button>
     </div>
   </div>
 </div>
