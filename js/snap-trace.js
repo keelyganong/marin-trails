@@ -1,9 +1,12 @@
 // Drag-to-trace snapping: finds the nearest point on the real trail network
-// (data/trail-network.js) to a map position, and walks along a way's actual
-// vertices between two positions on it — so dragging your cursor near a
-// trail produces a smooth line that follows its real shape, not straight
+// (data/trail-network.js) to a map position, so dragging your cursor near a
+// trail produces a line that hugs its real shape instead of straight
 // segments between sparse taps. See js/drawing.js for the drag interaction
-// that drives this.
+// that drives this — it resamples the drag densely in pixel space and
+// snaps each sub-point independently (rather than trying to "walk" a
+// single OSM way's own vertices), since a real trail is often split across
+// many separate way segments and tracking continuity within just one of
+// them jumps crudely at every boundary.
 
 let networkBBoxes = null;
 
@@ -62,28 +65,4 @@ function findNearestNetworkPoint(latlng, maxPixelDist) {
   }
 
   return (best && bestPixelDist <= maxPixelDist) ? best : null;
-}
-
-// -1 if (segA,tA) is before (segB,tB) along the way, 0 if equal, 1 if after.
-function comparePos(segA, tA, segB, tB) {
-  if (segA !== segB) return segA < segB ? -1 : 1;
-  if (tA === tB) return 0;
-  return tA < tB ? -1 : 1;
-}
-
-// Real vertices strictly after (fromSeg,fromT) up to and including
-// (toSeg,toT) — caller guarantees "to" is after "from" on the same way.
-// Each returned entry carries its own {wayIdx,segIdx,t}, not just the final
-// one, so a later backward drag can unwind precisely to any point in this
-// batch rather than only to its end.
-function walkForward(way, wayIdx, fromSeg, fromT, toSeg, toT) {
-  if (fromSeg === toSeg) {
-    return [{ pt: pointAtT(way, toSeg, toT), meta: { wayIdx, segIdx: toSeg, t: toT } }];
-  }
-  const out = [];
-  for (let i = fromSeg + 1; i <= toSeg; i++) {
-    out.push({ pt: way[i].slice(), meta: { wayIdx, segIdx: i, t: 0 } });
-  }
-  out.push({ pt: pointAtT(way, toSeg, toT), meta: { wayIdx, segIdx: toSeg, t: toT } });
-  return out;
 }

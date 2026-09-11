@@ -4,8 +4,10 @@
 //      to and follows the real trail network (data/trail-network.js, via
 //      js/snap-trace.js) instead of straight segments between taps. A
 //      plain tap (no real movement) still places a single point, snapped
-//      if it's near a trail. Live point count, distance, and location
-//      update as you go.
+//      if it's near a trail. Live distance and location update as you go.
+//      Dragging only ever captures the map when it STARTS near a trail —
+//      start a drag on empty map and it pans normally, so you're never
+//      stuck unable to reposition the map.
 //   2. naming: once tracing is done, the same panel switches to name /
 //      difficulty / local tips, with distance + elevation already filled in
 // Editing an existing custom trail (from the view sidebar's edit button)
@@ -18,7 +20,6 @@ const addTrailCloseBtn = document.getElementById('addTrailCloseBtn');
 const addTrailTracing = document.getElementById('addTrailTracing');
 const addTrailForm = document.getElementById('addTrailForm');
 const traceHintText = document.getElementById('traceHintText');
-const tracePointCount = document.getElementById('tracePointCount');
 const traceDistance = document.getElementById('traceDistance');
 const traceLocation = document.getElementById('traceLocation');
 const undoDrawBtn = document.getElementById('undoDrawBtn');
@@ -31,15 +32,21 @@ let drawLine = null, drawHalo = null;
 let drawPointMarkers = [];
 let editingTrail = null; // set when the panel is editing an existing custom trail
 
-// Dragging traces a route, so the map's own drag-to-pan has to give way
-// while a trace is in progress — re-enabled the moment draw mode ends.
-const DRAG_SNAP_PX = 22;   // generous "magnetic" radius while actively tracing
-const DRAG_SAMPLE_PX = 5;  // minimum cursor movement between processed samples
+// A drag only becomes a trace if it starts within this many pixels of the
+// network — otherwise it's left alone so the map can pan. Real trails are
+// split across many separate OSM way segments (a single named trail is
+// often a dozen+ of them), so rather than trying to "stay on the same way"
+// and jumping crudely at every boundary, each drag is densely resampled in
+// pixel space (every DRAG_SAMPLE_SPACING_PX) and each sub-sample snapped
+// independently — the line just hugs whatever's nearest at each fine step,
+// which tracks the real trail shape regardless of how it's split up.
+const DRAG_SNAP_PX = 22;
+const DRAG_SAMPLE_SPACING_PX = 6;
 
 let dragTraceActive = false;
-let dragNetworkState = null; // {wayIdx, segIdx, t} once snapped onto a way, else null
-let dragPointMeta = [];      // parallel to drawPoints entries added in the CURRENT gesture
 let lastSamplePixel = null;
+let mouseDownPixel = null;
+let mouseDownLatLng = null;
 let gestureStarts = []; // drawPoints length before each tap/drag gesture, for Undo
 
 function toLatLonArray(latlng) {
@@ -53,12 +60,11 @@ function updateLocationDisplays(text) {
 }
 
 function updateTraceHint() {
-  if (drawPoints.length === 0) traceHintText.textContent = 'Drag along a trail to trace it, or tap to place your trailhead.';
+  if (drawPoints.length === 0) traceHintText.textContent = 'Drag along a trail to trace it. Tap to place a point, or drag empty map to pan.';
   else traceHintText.textContent = 'Keep dragging or tapping to extend your route, then tap Done.';
 }
 
 function updateTraceStats() {
-  tracePointCount.textContent = drawPoints.length;
   traceDistance.textContent = `${pathDistanceMiles(drawPoints).toFixed(1)} mi`;
   const ready = drawPoints.length >= 2;
   doneDrawingBtn.style.opacity = ready ? '1' : '0.4';
@@ -99,27 +105,56 @@ function redrawDrawPreview() {
 }
 
 // ----- Drag-to-trace: snaps to the real trail network while dragging -----
-function pushTracePoint(pt, meta) {
-  drawPoints.push(toLatLonArray(pt));
-  dragPointMeta.push(meta);
+
+// Places one point, snapped to the network if it's near one. If the new
+// point lands far from the last drawn point (in screen pixels), it might be
+// the user dragging back over ground already traced this gesture rather
+// than continuing forward — search back through this gesture's points for
+// a close match and unwind to it instead of adding a doubled-back spike.
+function placeTracePoint(latlng) {
+  const snap = findNearestNetworkPoint(latlng, DRAG_SNAP_PX);
+  const candidate = snap ? snap.latlng : toLatLonArray(latlng);
+  const candidatePx = map.latLngToContainerPoint(L.latLng(candidate[0], candidate[1]));
+
+  if (drawPoints.length > 0) {
+    const lastPt = drawPoints[drawPoints.length - 1];
+    const lastPx = map.latLngToContainerPoint(L.latLng(lastPt[0], lastPt[1]));
+    const distToLast = Math.hypot(candidatePx.x - lastPx.x, candidatePx.y - lastPx.y);
+    if (distToLast > DRAG_SNAP_PX * 1.5) {
+      const gestureFloor = gestureStarts.length ? gestureStarts[gestureStarts.length - 1] : 0;
+      for (let idx = drawPoints.length - 2; idx >= gestureFloor; idx--) {
+        const pPt = drawPoints[idx];
+        const pPx = map.latLngToContainerPoint(L.latLng(pPt[0], pPt[1]));
+        if (Math.hypot(pPx.x - candidatePx.x, pPx.y - candidatePx.y) <= DRAG_SNAP_PX) {
+          drawPoints.length = idx + 1;
+          break;
+        }
+      }
+    }
+  }
+
+  drawPoints.push([candidate[0], candidate[1]]);
 }
 
 function handleTraceMouseDown(e) {
   if (!drawMode) return;
-  dragTraceActive = true;
-  dragPointMeta = [];
-  gestureStarts.push(drawPoints.length);
-  lastSamplePixel = map.latLngToContainerPoint(e.latlng);
+  mouseDownPixel = map.latLngToContainerPoint(e.latlng);
+  mouseDownLatLng = e.latlng;
 
-  const isFirstPoint = drawPoints.length === 0;
-  const snap = findNearestNetworkPoint(e.latlng, DRAG_SNAP_PX);
-  if (snap) {
-    pushTracePoint(snap.latlng, { wayIdx: snap.wayIdx, segIdx: snap.segIdx, t: snap.t });
-    dragNetworkState = { wayIdx: snap.wayIdx, segIdx: snap.segIdx, t: snap.t };
-  } else {
-    pushTracePoint(e.latlng, null);
-    dragNetworkState = null;
+  // Only capture the drag if it starts near a trail — otherwise leave it
+  // alone entirely so the map's own drag-to-pan handles it. A plain tap
+  // that started off-trail is handled on mouseup below.
+  if (!findNearestNetworkPoint(e.latlng, DRAG_SNAP_PX)) {
+    dragTraceActive = false;
+    return;
   }
+
+  dragTraceActive = true;
+  map.dragging.disable();
+  gestureStarts.push(drawPoints.length);
+  lastSamplePixel = mouseDownPixel;
+  const isFirstPoint = drawPoints.length === 0;
+  placeTracePoint(e.latlng);
 
   redrawDrawPreview();
   updateTraceStats();
@@ -133,58 +168,60 @@ function handleTraceMouseDown(e) {
 function handleTraceMouseMove(e) {
   if (!dragTraceActive) return;
   const px = map.latLngToContainerPoint(e.latlng);
-  if (lastSamplePixel && Math.hypot(px.x - lastSamplePixel.x, px.y - lastSamplePixel.y) < DRAG_SAMPLE_PX) return;
-  lastSamplePixel = px;
+  const dist = Math.hypot(px.x - lastSamplePixel.x, px.y - lastSamplePixel.y);
+  if (dist < 1) return;
 
-  const snap = findNearestNetworkPoint(e.latlng, DRAG_SNAP_PX);
-
-  if (snap && dragNetworkState && snap.wayIdx === dragNetworkState.wayIdx) {
-    const way = TRAIL_NETWORK[snap.wayIdx];
-    const cmp = comparePos(dragNetworkState.segIdx, dragNetworkState.t, snap.segIdx, snap.t);
-    if (cmp < 0) {
-      // Dragged forward along the same trail — fill in its real vertices.
-      const steps = walkForward(way, snap.wayIdx, dragNetworkState.segIdx, dragNetworkState.t, snap.segIdx, snap.t);
-      steps.forEach(({ pt, meta }) => pushTracePoint(pt, meta));
-      dragNetworkState = { wayIdx: snap.wayIdx, segIdx: snap.segIdx, t: snap.t };
-    } else if (cmp > 0) {
-      // Dragged back over ground already traced this gesture — unwind to
-      // the new position instead of adding a doubled-back spike.
-      while (dragPointMeta.length > 0) {
-        const last = dragPointMeta[dragPointMeta.length - 1];
-        if (!last || last.wayIdx !== snap.wayIdx || comparePos(last.segIdx, last.t, snap.segIdx, snap.t) <= 0) break;
-        dragPointMeta.pop();
-        drawPoints.pop();
-      }
-      pushTracePoint(snap.latlng, { wayIdx: snap.wayIdx, segIdx: snap.segIdx, t: snap.t });
-      dragNetworkState = { wayIdx: snap.wayIdx, segIdx: snap.segIdx, t: snap.t };
-    }
-    // cmp === 0: hasn't moved along the way yet — nothing to add.
-  } else if (snap) {
-    // Landed on a different trail than before (a junction, or the first
-    // snap after being off-network) — a short straight connector is fine.
-    pushTracePoint(snap.latlng, { wayIdx: snap.wayIdx, segIdx: snap.segIdx, t: snap.t });
-    dragNetworkState = { wayIdx: snap.wayIdx, segIdx: snap.segIdx, t: snap.t };
-  } else {
-    // Off any trail — freehand.
-    pushTracePoint(e.latlng, null);
-    dragNetworkState = null;
+  // Resample the straight pixel-space path since the last processed point
+  // at a fixed spacing, snapping each sub-point independently — this is
+  // what makes the line hug the real trail shape even through a fast drag
+  // that only fires a few browser mousemove events.
+  const steps = Math.max(1, Math.ceil(dist / DRAG_SAMPLE_SPACING_PX));
+  for (let s = 1; s <= steps; s++) {
+    const t = s / steps;
+    const samplePx = { x: lastSamplePixel.x + (px.x - lastSamplePixel.x) * t, y: lastSamplePixel.y + (px.y - lastSamplePixel.y) * t };
+    placeTracePoint(map.containerPointToLatLng(samplePx));
   }
+  lastSamplePixel = px;
 
   redrawDrawPreview();
   updateTraceStats();
 }
 
-function handleTraceMouseUp() {
-  if (!dragTraceActive) return;
-  dragTraceActive = false;
-  dragNetworkState = null;
-  dragPointMeta = [];
-  updateTraceHint();
+function handleTraceMouseUp(e) {
+  if (dragTraceActive) {
+    dragTraceActive = false;
+    map.dragging.enable();
+    updateTraceHint();
+    mouseDownLatLng = null;
+    return;
+  }
+  // Didn't capture on mousedown (started off-trail). If the mouse never
+  // moved much, treat it as a plain tap and place a freehand point;
+  // otherwise it was a genuine pan and there's nothing to do.
+  if (!mouseDownLatLng) return;
+  const upPx = e && e.latlng ? map.latLngToContainerPoint(e.latlng) : mouseDownPixel;
+  const moved = mouseDownPixel ? Math.hypot(upPx.x - mouseDownPixel.x, upPx.y - mouseDownPixel.y) : Infinity;
+  if (moved < DRAG_SAMPLE_SPACING_PX) {
+    gestureStarts.push(drawPoints.length);
+    const isFirstPoint = drawPoints.length === 0;
+    drawPoints.push(toLatLonArray(mouseDownLatLng));
+    redrawDrawPreview();
+    updateTraceStats();
+    updateTraceHint();
+    if (isFirstPoint) {
+      traceLocation.textContent = 'Locating…';
+      fetchRouteLocationLabel(drawPoints[0]);
+    }
+  }
+  mouseDownLatLng = null;
 }
 
 // Safety net: if the button is released off the map (or the tab loses
-// focus mid-drag), don't leave tracing stuck "active".
-document.addEventListener('mouseup', () => { if (dragTraceActive) handleTraceMouseUp(); });
+// focus mid-drag), don't leave tracing — or map panning — stuck disabled.
+document.addEventListener('mouseup', () => {
+  if (dragTraceActive) { dragTraceActive = false; map.dragging.enable(); updateTraceHint(); }
+  mouseDownLatLng = null;
+});
 
 // ----- Panel phase switching -----
 function showTracingPhase() {
@@ -217,7 +254,9 @@ function enterDrawMode() {
   updateTraceHint();
   updateTraceStats();
   closeSidebar();
-  map.dragging.disable(); // dragging now traces a route instead of panning
+  // Map dragging stays enabled by default — it's only disabled per-gesture,
+  // in handleTraceMouseDown, when a drag actually starts near a trail. That
+  // way a drag anywhere else still pans the map normally.
   map.on('mousedown', handleTraceMouseDown);
   map.on('mousemove', handleTraceMouseMove);
   map.on('mouseup', handleTraceMouseUp);
@@ -228,7 +267,7 @@ function exitDrawMode(discard) {
   dragTraceActive = false;
   addTrailBtn.classList.remove('active');
   mapEl.classList.remove('drawing-mode');
-  map.dragging.enable();
+  map.dragging.enable(); // safety net in case a gesture left it disabled
   map.off('mousedown', handleTraceMouseDown);
   map.off('mousemove', handleTraceMouseMove);
   map.off('mouseup', handleTraceMouseUp);

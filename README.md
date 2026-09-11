@@ -133,19 +133,27 @@ CalTopo's work.
 - **`js/snap-trace.js`** — given a map position, finds the nearest point on
   that network (a cheap bounding-box prefilter narrows ~5,400 ways down to
   the handful actually nearby before doing precise pixel-distance checks on
-  their segments), and can walk a way's real vertices between two positions
-  on it.
+  their segments).
 
-- **`js/drawing.js`** — drives the actual drag interaction: mousedown starts
-  a trace (snapped if near a trail, freehand otherwise), each mousemove
-  sample either walks forward along the real vertices of the trail you're
-  following, jumps to a new trail if you've crossed onto one, unwinds
-  cleanly if you drag back over ground already traced (no doubled-back
-  spike), or falls back to freehand if you're off any trail. Map
-  drag-to-pan is disabled while tracing, since dragging now means "trace" —
-  zoom with scroll instead. A plain tap (no real movement) still places a
-  single point. Undo removes the whole last drag stroke or tap at once,
-  not one point at a time.
+- **`js/drawing.js`** — drives the actual drag interaction. A drag only
+  becomes a trace if it *starts* within snapping distance of the network;
+  otherwise it's left alone so the map's own drag-to-pan handles it — so
+  you're never stuck unable to reposition the map, you just need to start
+  the next drag from empty space (or zoom with scroll, which always works).
+  While tracing, each mousemove is densely resampled in pixel space (every
+  ~6px) and each sub-point snapped to the network independently, rather
+  than trying to track continuity within a single OSM way — real trails
+  are typically split across a dozen-plus separate way segments, and the
+  earlier per-way approach jumped crudely at every one of those boundaries.
+  Independent snapping just hugs whatever's nearest at each fine step,
+  which tracks the real trail shape regardless of how it's fragmented
+  underneath. If a new snapped point lands far from the last drawn one, it
+  might be a backward correction rather than forward progress — the recent
+  points in the current gesture are checked for a close match and unwound
+  to, rather than adding a doubled-back spike. A plain tap (no real
+  movement) still places a single point, snapped if near a trail. Undo
+  removes the whole last drag stroke or tap at once, not one point at a
+  time — a single stroke can add many points.
 
 To rebuild the network after OSM coverage changes:
 
