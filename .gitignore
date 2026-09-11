@@ -1,0 +1,9 @@
+# Raw OSM extract cache and the intermediate geometry build product — both
+# large and fully reproducible via scripts/fetch-osm-extract.pl +
+# scripts/build-trail-geometry.pl. data/trails.js (the final merged output
+# the app actually loads) stays in version control.
+.cache/
+data/trails-geometry.json
+
+.DS_Store
+

@@ -1,0 +1,84 @@
+{
+  "trails": [
+    {
+      "id": "dipsea",
+      "name": "Dipsea Trail",
+      "address": "352 Throckmorton Ave, Mill Valley, CA 94941",
+      "difficulty": "Strenuous",
+      "elevation": "2,200 ft gain",
+      "blurb": "The legendary Mill Valley–to–Stinson Beach classic, and the oldest trail race route in the country.",
+      "distanceType": "one-way",
+      "extraStats": [["1904", "Built"]]
+    },
+    {
+      "id": "tennessee-valley",
+      "name": "Tennessee Valley Trail",
+      "address": "Tennessee Valley Rd, Mill Valley, CA 94941",
+      "difficulty": "Easy",
+      "elevation": "200 ft gain",
+      "blurb": "A flat, easy out-and-back through open valley to a secluded cove beach.",
+      "distanceType": "out-and-back",
+      "extraStats": [["GGNRA", "Managed by"]]
+    },
+    {
+      "id": "cataract-falls",
+      "name": "Cataract Falls Trail",
+      "address": "Rock Spring, Ridgecrest Blvd, Mill Valley, CA 94941",
+      "difficulty": "Moderate",
+      "elevation": "900 ft gain",
+      "blurb": "A string of waterfalls along Cataract Creek, best after rain, running through the Mt Tamalpais watershed.",
+      "distanceType": "one-way",
+      "extraStats": [["Mt Tam", "Watershed"]]
+    },
+    {
+      "id": "steep-ravine",
+      "name": "Steep Ravine Trail",
+      "address": "3801 Panoramic Hwy, Mill Valley, CA 94941",
+      "difficulty": "Strenuous",
+      "elevation": "1,000 ft gain",
+      "blurb": "A short, steep redwood-canyon trail — the only one in Marin with a built-in ladder.",
+      "distanceType": "one-way",
+      "extraStats": [["1 ladder", "Notable feature"]]
+    },
+    {
+      "id": "matt-davis",
+      "name": "Matt Davis Trail",
+      "address": "3801 Panoramic Hwy, Mill Valley, CA 94941",
+      "difficulty": "Moderate",
+      "elevation": "1,400 ft gain",
+      "blurb": "Golden hillsides and coastal panoramas between Stinson Beach and Pantoll — a locals' favorite.",
+      "distanceType": "one-way",
+      "extraStats": [["Mt Tam SP", "Location"]]
+    },
+    {
+      "id": "phoenix-lake",
+      "name": "Phoenix Lake Loop",
+      "address": "Natalie Coffin Greene Park, Lagunitas Rd, Ross, CA 94957",
+      "difficulty": "Easy",
+      "elevation": "230 ft gain",
+      "blurb": "A gentle loop around a historic reservoir in Kentfield — flat, shaded, and close to home.",
+      "distanceType": "loop",
+      "extraStats": [["1905", "Dam built"]]
+    },
+    {
+      "id": "old-railroad-grade",
+      "name": "Old Railroad Grade",
+      "address": "Blithedale Ridge / Fern Canyon Rd, Mill Valley, CA 94941",
+      "difficulty": "Moderate",
+      "elevation": "2,100 ft gain",
+      "blurb": "A gradual, historic climb to East Peak along the old \"Crookedest Railroad in the World\" route.",
+      "distanceType": "one-way",
+      "extraStats": [["1896", "Railway opened"]]
+    },
+    {
+      "id": "muir-woods-main",
+      "name": "Muir Woods Main Trail",
+      "address": "1 Muir Woods Rd, Mill Valley, CA 94941",
+      "difficulty": "Easy",
+      "elevation": "Flat",
+      "blurb": "A flat, paved loop through old-growth redwoods along Redwood Creek — the easiest way to feel the scale of the forest.",
+      "distanceType": "loop",
+      "extraStats": [["Redwoods", "Feature"]]
+    }
+  ]
+}

@@ -1,0 +1,77 @@
+{
+  "trails": [
+    {
+      "id": "dipsea",
+      "name": "Dipsea Trail",
+      "mode": "name",
+      "nameRegex": "^Dipsea Trail$",
+      "bbox": [37.895, -122.66, 37.912, -122.54],
+      "seed": [37.9060, -122.5449],
+      "expectedMiles": 7.4
+    },
+    {
+      "id": "tennessee-valley",
+      "name": "Tennessee Valley Trail",
+      "mode": "name",
+      "nameRegex": "^(Tennessee Valley Trail|Lower Tennessee Valley Trail)$",
+      "bbox": [37.850, -122.555, 37.862, -122.530],
+      "seed": [37.8580, -122.5380],
+      "expectedMiles": 1.8
+    },
+    {
+      "id": "cataract-falls",
+      "name": "Cataract Falls Trail",
+      "mode": "name",
+      "nameRegex": "^Cataract Trail$",
+      "bbox": [37.905, -122.645, 37.940, -122.605],
+      "seed": [37.9160, -122.6115],
+      "expectedMiles": 3.0
+    },
+    {
+      "id": "steep-ravine",
+      "name": "Steep Ravine Trail",
+      "mode": "name",
+      "nameRegex": "^Steep Ravine Trail$",
+      "bbox": [37.895, -122.635, 37.910, -122.598],
+      "seed": [37.9067, -122.6018],
+      "expectedMiles": 2.0
+    },
+    {
+      "id": "matt-davis",
+      "name": "Matt Davis Trail",
+      "mode": "name",
+      "nameRegex": "^Matt Davis Trail$",
+      "bbox": [37.898, -122.65, 37.912, -122.598],
+      "seed": [37.9008, -122.6443],
+      "expectedMiles": 3.5
+    },
+    {
+      "id": "old-railroad-grade",
+      "name": "Old Railroad Grade",
+      "mode": "name",
+      "nameRegex": "^Old Railroad Grade (Fire Road|Fr Road)$",
+      "bbox": [37.903, -122.60, 37.926, -122.545],
+      "seed": [37.9060, -122.5486],
+      "expectedMiles": 7.5
+    },
+    {
+      "id": "muir-woods-main",
+      "name": "Muir Woods Main Trail",
+      "mode": "name",
+      "nameRegex": "^(Redwood Creek Trail|Bohemian Grove Trail)$",
+      "bbox": [37.895, -122.583, 37.902, -122.575],
+      "seed": [37.8964, -122.5802],
+      "expectedMiles": 0.6,
+      "surfaceRegex": "^(paved|asphalt|wood)$"
+    },
+    {
+      "id": "phoenix-lake",
+      "name": "Phoenix Lake Loop",
+      "mode": "wayIds",
+      "comment": "No single OSM name covers this loop; these are every path/footway/track way within 50m of the Phoenix Lake shoreline (found via an Overpass `around` query), which together trace the perimeter loop.",
+      "wayIds": [34684134, 34684608, 502851490, 1494520146],
+      "seed": [37.9600, -122.5815],
+      "expectedMiles": 2.7
+    }
+  ]
+}
