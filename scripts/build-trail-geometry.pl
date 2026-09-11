@@ -108,6 +108,44 @@ sub chain_ways {
   return (\@path, \@gaps);
 }
 
+# For a hand-verified sequence of ways (confirmed connected via matching or
+# near-matching endpoints), concatenate them in EXACTLY the given order,
+# each auto-oriented to best continue the running path — unlike chain_ways,
+# never reordering or skipping based on which candidate is nearest. Needed
+# because at a real junction where 3+ ways meet, the nearest-endpoint greedy
+# search can "steal" a connection that numerically looks closer but isn't
+# the intended route (confirmed happening for yolanda-hidden-meadow, where
+# it kept connecting Shaver Grade Road straight to Hidden Meadow Trail
+# instead of continuing on to Diblee Road as intended).
+# $reverses (optional, parallel to $ways) forces each way's direction
+# explicitly instead of auto-picking whichever end looks closer — needed
+# because at a junction with 3+ ways, "closer" for THIS connection can be
+# the wrong choice for the NEXT one, silently producing a worse path.
+# Verify explicit directions once by inspecting real endpoint coordinates
+# (see the "comment" field in trail-sources.json for the ones this was
+# needed for) rather than trusting auto-orientation's local guess.
+sub chain_ordered {
+  my ($ways, $seed, $reverses) = @_;
+  return ([], []) unless @$ways;
+  my @gaps;
+  my $first = $ways->[0];
+  my $firstRev = defined($reverses->[0]) ? $reverses->[0]
+    : (haversine_miles($seed, $first->[-1]) < haversine_miles($seed, $first->[0]));
+  my @path = $firstRev ? reverse(@$first) : @$first;
+  for my $i (1 .. $#$ways) {
+    my $way = $ways->[$i];
+    my $tail = $path[-1];
+    my $rev = defined($reverses->[$i]) ? $reverses->[$i]
+      : (haversine_miles($tail, $way->[-1]) < haversine_miles($tail, $way->[0]));
+    my @seg = $rev ? reverse(@$way) : @$way;
+    my $gapMiles = haversine_miles($tail, $seg[0]);
+    push @gaps, [$gapMiles, $tail, $seg[0]] if $gapMiles > 0.05;
+    shift @seg;
+    push @path, @seg;
+  }
+  return (\@path, \@gaps);
+}
+
 my $cache = read_json_file('.cache/osm-raw-ways.json');
 my $sources = read_json_file('data/trail-sources.json');
 
@@ -150,10 +188,11 @@ for my $t (@{$sources->{trails}}) {
       }
       push @matched, $el;
     }
-  } elsif ($t->{mode} eq 'wayIds') {
-    my @missing = grep { !exists $cacheById{$_} } @{$t->{wayIds}};
+  } elsif ($t->{mode} eq 'wayIds' || $t->{mode} eq 'ordered') {
+    my $idListKey = $t->{mode} eq 'ordered' ? 'orderedWayIds' : 'wayIds';
+    my @missing = grep { !exists $cacheById{$_} } @{$t->{$idListKey}};
     my $fetched = fetch_ways_by_id(@missing);
-    for my $wid (@{$t->{wayIds}}) {
+    for my $wid (@{$t->{$idListKey}}) {
       my $el = $cacheById{$wid} // $fetched->{$wid};
       push @matched, $el if $el;
     }
@@ -169,7 +208,9 @@ for my $t (@{$sources->{trails}}) {
 
   my @geoms = map { [ map { [$_->{lat}, $_->{lon}] } @{$_->{geometry}} ] } @matched;
   my @wayIds = map { $_->{id} } @matched;
-  my ($path, $gaps) = chain_ways(\@geoms, $t->{seed});
+  my ($path, $gaps) = $t->{mode} eq 'ordered'
+    ? chain_ordered(\@geoms, $t->{seed}, $t->{orderedReverses} || [])
+    : chain_ways(\@geoms, $t->{seed});
   my $miles = path_miles($path);
   my $expected = $t->{expectedMiles};
   my $ratio = $expected ? $miles / $expected : 1;

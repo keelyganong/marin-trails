@@ -68,26 +68,28 @@
       "id": "phoenix-lake",
       "name": "Phoenix Lake Loop",
       "mode": "wayIds",
-      "comment": "No single OSM name covers this loop; these are every path/footway/track way within 50m of the Phoenix Lake shoreline (found via an Overpass `around` query), which together trace the perimeter loop.",
-      "wayIds": [34684134, 34684608, 502851490, 1494520146],
+      "comment": "Path/footway/track ways within 50m of the Phoenix Lake shoreline (an Overpass `around` query), plus Diblee Road (34685146 + its two tiny stub segments) which forms the northeast stretch of the loop per local knowledge — the real route goes up Diblee Road and back down the same way. Harry Allen Trail (34684134) dropped: it's a dead-end spur south of the lake, not part of the loop, and created a false spike.",
+      "wayIds": [34684608, 502851490, 1494520146, 34685146, 1286714172, 1286714173],
       "seed": [37.9600, -122.5815],
       "expectedMiles": 2.7
     },
     {
       "id": "yolanda-hidden-meadow",
       "name": "Yolanda Trail to Hidden Meadow Loop",
-      "mode": "name",
-      "nameRegex": "^(Yolanda Trail|Hidden Meadow Trail)$",
-      "bbox": [37.955, -122.60, 37.975, -122.575],
-      "seed": [37.9650, -122.5946],
-      "expectedMiles": 3.4
+      "mode": "ordered",
+      "comment": "Per local knowledge: Yolanda Trail -> Hidden Meadow Trail -> Shaver Grade Road -> back down Diblee Road, starting/ending at Natalie Coffin Greene Park (the same trailhead as Phoenix Lake). Uses 'ordered' mode (exact given sequence, not greedy-nearest) because at the real junction where Shaver Grade Road, Hidden Meadow Trail, and Deer Park Fire Road all meet, the greedy chainer kept connecting straight to Hidden Meadow Trail instead of continuing on to Diblee Road as intended. Endpoints verified: Shaver Grade Road way 33803253 and 33803152 share an exact node (37.9557926,-122.5847180), and 33803152 shares an exact node with Diblee Road 34685146 (37.9564878,-122.5770479).",
+      "orderedWayIds": [35600320, 35025474, 33803253, 33803152, 34685146, 1286714173, 1286714172],
+      "orderedReverses": [true, true, false, false, false, false, false],
+      "seed": [37.9600, -122.5815],
+      "expectedMiles": 4.5
     },
     {
       "id": "bon-tempe-loop",
       "name": "Bon Tempe Loop",
-      "mode": "wayIds",
-      "comment": "No single OSM name covers this loop; these are every path/footway/track way within 60m of the Bon Tempe Lake shoreline (found via an Overpass `around` query, excluding Rocky Ridge Fire Road which only brushes the lake before climbing well away from it), which together trace the perimeter loop.",
-      "wayIds": [234065570, 234065890, 234065891, 35061604, 1491954657, 1491954658, 1491954659, 1281829449, 1281829451, 12172676, 1491954661, 35061846],
+      "mode": "ordered",
+      "comment": "No single OSM name covers this loop; these are every path/footway/track way within 60m of the Bon Tempe Lake shoreline (an Overpass `around` query, excluding Rocky Ridge Fire Road which only brushes the lake before climbing well away from it). Uses 'ordered' mode with hand-verified endpoints — greedy nearest-endpoint chaining produced two straight lines cutting across the lake because at several junctions a farther-around-the-shore way looked numerically closer than the correct next segment. Endpoints checked: all consecutive pairs below share an exact or near-exact node except Bon Tempe Dam Road -> Shadyside Trail (~0.06mi, a real gap) and Shadyside Trail -> the Pine Point stub (~0.13mi, also real).",
+      "orderedWayIds": [234065570, 234065891, 234065890, 35061846, 1491954661, 12172676, 1281829449, 1281829451, 1491954658, 1491954659, 35061604, 1491954657],
+      "orderedReverses": [false, false, false, false, true, true, true, false, false, false, false, false],
       "seed": [37.9592, -122.6099],
       "expectedMiles": 3.6
     },
@@ -95,10 +97,11 @@
       "id": "bald-hill",
       "name": "Bald Hill Loop",
       "mode": "name",
-      "nameRegex": "^Bald Hill Trail$",
-      "bbox": [37.960, -122.60, 37.975, -122.585],
-      "seed": [37.9650, -122.5942],
-      "expectedMiles": 1.4
+      "comment": "Bald Hill Trail's own tagged start sits at an exact shared node with Hidden Meadow Trail's endpoint, not at the park itself — Hidden Meadow Trail is included so the chain actually reaches the real trailhead instead of starting mid-trail.",
+      "nameRegex": "^(Hidden Meadow Trail|Bald Hill Trail)$",
+      "bbox": [37.955, -122.60, 37.975, -122.585],
+      "seed": [37.9600, -122.5815],
+      "expectedMiles": 1.8
     }
   ]
 }

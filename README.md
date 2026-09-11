@@ -104,23 +104,33 @@ perl scripts/merge-trail-data.pl
 **Known data quality note:** Phoenix Lake Loop has no single OSM-tagged
 trail name for its lake-perimeter path — it's assembled from every
 named/unnamed way within 50m of the lake shoreline (see the `wayIds` mode
-in `trail-sources.json`), and one stretch of the loop (the north side, near
-the dam/park entrance) isn't covered by any nearby-tagged way in OSM, so
-that segment is a straight bridge rather than a true trace. Distance still
-comes out close to the commonly cited 2.7mi. If you have or can record a
-GPX trace of that segment, it'd be worth hand-splicing in.
+in `trail-sources.json`) plus Diblee Road, which local knowledge confirms
+is genuinely part of the route (up and back down the same way, on the
+loop's northeast side). One stretch (the north side, near the dam/park
+entrance) isn't covered by any nearby-tagged way in OSM, so that segment
+is a straight bridge rather than a true trace.
 
-The same trade-off applies to a few of the later additions: **Bon Tempe
-Loop** is built the same way as Phoenix Lake (a curated `wayIds` list from
-an Overpass `around` query on the shoreline) and has a couple of similar
-small bridged gaps. **Yolanda Trail to Hidden Meadow Loop** has one longer
-bridge (~0.65mi) — the two trails' real-world junction is apparently
-mid-way along one of the ways rather than at either way's endpoint, and the
-stitching in `build-trail-geometry.pl` only ever joins ways at their
-endpoints, not at interior points — so it bridges between the two nearest
-endpoints instead. Detecting mid-way junctions would need a real graph
-join, not just nearest-endpoint chaining; noted here as a follow-up rather
-than solved.
+**A more fundamental issue surfaced across three trails** (Phoenix Lake,
+Bon Tempe Loop, Yolanda/Hidden Meadow): the original nearest-endpoint
+greedy chaining can pick a *wrong* connection at a real junction where 3+
+ways meet, because a farther-around-the-shore way can look numerically
+closer than the one that's actually next on the route — this produced
+visibly wrong straight lines cutting across Bon Tempe Lake, confirmed
+against local knowledge of the actual trails. Fixed with a new `"ordered"`
+mode in `build-trail-geometry.pl`: instead of greedily picking whichever
+remaining way looks nearest at each step, it concatenates a hand-verified
+sequence of way ids in exactly the given order (each still auto-oriented
+to continue the path, unless a `orderedReverses` array pins the direction
+explicitly for a case where auto-orientation itself picked the direction
+that broke the *next* connection). Bon Tempe Loop and Yolanda Trail to
+Hidden Meadow Loop both use it now, with each consecutive pair's endpoints
+individually checked against the raw OSM data (documented in each trail's
+`"comment"` field) rather than assumed. **Yolanda Trail to Hidden Meadow
+Loop** still has one real ~0.6mi bridge — the two trails' true junction
+appears to be mid-way along one of the ways rather than at either way's
+endpoint, and chaining (ordered or greedy) only ever joins ways at their
+endpoints; detecting a mid-way junction would need an actual graph join,
+noted here as a follow-up rather than solved.
 
 ## Drag-to-trace: snapping custom routes to the real trail network
 
