@@ -39,9 +39,9 @@
     <svg viewBox="0 0 24 24" fill="none"><path d="M12 21s-7.5-4.6-10-9.2C.4 8.5 2 4.8 5.6 4.1c2-.4 4 .5 5.1 2.2C11.8 4.6 13.8 3.7 15.8 4.1c3.6.7 5.2 4.4 3.6 7.7C16.9 16.4 12 21 12 21z" fill="#C1542E" stroke="#C1542E" stroke-width="1.2"/></svg>
     <span id="favCount">0</span> favorited
   </div>
-  <button class="sync-btn" id="syncBtn" title="Sync your traced routes across devices">
+  <button class="sync-btn" id="syncBtn" title="See your traced routes on another device">
     <svg viewBox="0 0 24 24" fill="none"><path d="M4 12a8 8 0 0 1 13.66-5.66L20 8M20 4v4h-4M20 12a8 8 0 0 1-13.66 5.66L4 16M4 20v-4h4" stroke="#3D6C82" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    Sync
+    Sync routes
   </button>
 </div>
 
@@ -49,8 +49,8 @@
   <div class="sync-panel-inner">
     <div class="sheet-header" style="padding:20px 22px 14px;">
       <div>
-        <h2 style="font-size:19px; margin:0 0 4px;">Sync your routes</h2>
-        <div class="loc">Across your own devices, not shared with others</div>
+        <h2 style="font-size:19px; margin:0 0 4px;">Sync your traced routes</h2>
+        <div class="loc">For routes you draw yourself — not the built-in trails</div>
       </div>
       <button class="sheet-close" id="syncPanelClose">
         <svg viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="#171F16" stroke-width="2" stroke-linecap="round"/></svg>
@@ -58,8 +58,9 @@
     </div>
     <div class="sheet-body" style="padding:4px 22px 22px;">
       <p style="font-size:13px; line-height:1.5; color:var(--ink); margin:0 0 14px;">
-        This code is private to you — anyone who has it can see and edit these routes, so don't share it. Enter it on another device to see your traced routes there too.
+        Routes you trace with "Add trail" are saved only on this browser by default. This code links them to your other devices too — no account needed. Anyone with the code can see and edit them, so don't share it.
       </p>
+      <div id="syncOwnCount" class="loc" style="margin-bottom:10px;"></div>
       <div class="sync-code-display" id="syncCodeDisplay">…</div>
       <button class="btn-viewmore" id="copySyncCodeBtn" style="width:100%; margin-bottom:18px;">Copy code</button>
       <div class="form-field" style="margin-bottom:10px;">
