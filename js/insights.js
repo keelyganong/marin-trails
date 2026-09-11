@@ -1,24 +1,97 @@
-// Live AI-generated trail insights (history / recent notes / community
-// sentiment), via /api/anthropic — a small server-side proxy (see
-// api/anthropic.js) that holds the Anthropic API key, since the browser
-// can't call api.anthropic.com directly (no CORS headers for browser
-// origins). Falls back to static content (data/fallback-insights.js) if
-// the call fails.
+// Trail insights sidebar content. Split into two tiers:
+//
+// - History: static, from data/fallback-insights.js. It doesn't change, so
+//   there's no reason to spend an API call regenerating it — rendered
+//   immediately, no network request.
+// - Recent conditions + community sentiment: live, via /api/insights (a
+//   cached server-side endpoint — see api/insights.js) so it reflects
+//   current closures, season, crowding, and what hikers are saying lately.
+//   Shown with a relative "Updated X ago" timestamp and category tags.
+//
+// Custom (isCustom) trails skip the live call entirely — there's no public
+// information about a route only you have drawn — and just show
+// GENERIC_FALLBACK_INSIGHTS throughout.
 
-function renderSkeleton() {
+const INSIGHT_TAG_LABELS = {
+  closure: 'Closure',
+  seasonal: 'Seasonal',
+  crowd: 'Crowded',
+  conditions: 'Trail conditions',
+  wildlife: 'Wildlife',
+};
+
+function formatRelativeTime(isoString) {
+  const then = new Date(isoString).getTime();
+  if (Number.isNaN(then)) return '';
+  const diffMs = Date.now() - then;
+  const minutes = Math.round(diffMs / 60000);
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`;
+  const days = Math.round(hours / 24);
+  return `${days} day${days === 1 ? '' : 's'} ago`;
+}
+
+function renderInsightTags(tags) {
+  if (!tags || tags.length === 0) return '';
+  return `<div class="insight-tags">${tags.map(t =>
+    `<span class="insight-tag insight-tag-${t}">${INSIGHT_TAG_LABELS[t] || t}</span>`
+  ).join('')}</div>`;
+}
+
+function renderRefreshMeta(generatedAt) {
+  if (!generatedAt) return '';
+  return `<span class="insight-refresh-label">Updated ${formatRelativeTime(generatedAt)}</span>`;
+}
+
+function renderHistory(trail) {
+  const source = (FALLBACK_INSIGHTS[trail.id] || GENERIC_FALLBACK_INSIGHTS);
   sheetBody.innerHTML = `
-    <div class="sheet-section"><h3>History</h3><div class="skeleton"></div><div class="skeleton"></div></div>
-    <div class="sheet-section"><h3>Recent on the trail</h3><div class="skeleton"></div><div class="skeleton"></div></div>
-    <div class="sheet-section"><h3>What people are saying</h3><div class="skeleton"></div><div class="skeleton"></div></div>
+    <div class="sheet-section"><h3>History</h3><p>${source.history}</p></div>
+    <div class="sheet-section" id="recentSection"><h3>Recent conditions</h3><div class="skeleton"></div><div class="skeleton"></div></div>
+    <div class="sheet-section" id="communitySection"><h3>What people are saying</h3><div class="skeleton"></div><div class="skeleton"></div></div>
   `;
 }
 
-function renderInsights(data) {
-  sheetBody.innerHTML = `
-    <div class="sheet-section"><h3>History</h3><p>${data.history}</p></div>
-    <div class="sheet-section"><h3>Recent on the trail</h3><p>${data.recentNotes}</p></div>
-    <div class="sheet-section"><h3>What people are saying</h3><p>${data.communitySentiment}</p></div>
+function renderLiveSections(data) {
+  const recentSection = document.getElementById('recentSection');
+  const communitySection = document.getElementById('communitySection');
+  if (!recentSection || !communitySection) return;
+
+  const recentText = data.recentConditions.text || 'Nothing notable found right now — conditions look routine.';
+  recentSection.innerHTML = `
+    <div class="insight-header"><h3>Recent conditions</h3>${renderRefreshMeta(data.generatedAt)}</div>
+    ${renderInsightTags(data.recentConditions.tags)}
+    <p>${recentText}</p>
   `;
+  communitySection.innerHTML = `
+    <div class="insight-header"><h3>What people are saying</h3>${renderRefreshMeta(data.generatedAt)}</div>
+    <p>${data.communitySentiment.text}</p>
+  `;
+}
+
+function renderStaticFallbackSections(trail) {
+  const source = (FALLBACK_INSIGHTS[trail.id] || GENERIC_FALLBACK_INSIGHTS);
+  const recentSection = document.getElementById('recentSection');
+  const communitySection = document.getElementById('communitySection');
+  if (!recentSection || !communitySection) return;
+  recentSection.innerHTML = `<h3>Recent conditions</h3><p>${source.recentNotes}</p>`;
+  communitySection.innerHTML = `<h3>What people are saying</h3><p>${source.communitySentiment}</p>`;
+}
+
+async function fetchLiveInsights(trailId) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+  try {
+    const res = await fetch(`/api/insights?trailId=${encodeURIComponent(trailId)}`, { signal: controller.signal });
+    if (!res.ok) throw new Error('Insights fetch failed: ' + res.status);
+    const data = await res.json();
+    if (!data.recentConditions || !data.communitySentiment) throw new Error('Unexpected response shape');
+    return data;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 // Best-effort reverse-lookup for a custom route's starting point, using the
@@ -65,43 +138,4 @@ async function fetchRouteLocationLabel(startPoint) {
   } finally {
     clearTimeout(timeout);
   }
-}
-
-async function fetchInsights(trail) {
-  const prompt = `Give me an in-depth, trustworthy profile of "${trail.name}" in Marin County, California, for a hiking/running app. Respond ONLY with raw JSON (no markdown fences, no preamble, no explanation before or after) with exactly these keys: "history" (2-3 sentences on real, verifiable history or origin of the trail), "recentNotes" (2-3 sentences on genuinely useful current/seasonal info a hiker would want, e.g. conditions, access, timing), "communitySentiment" (2-3 sentences synthesizing what hikers commonly and recently say about this specific trail, in your own words, no fabricated quotes). Be concise and only include what you're confident is accurate; omit anything you're unsure about rather than guess. Your entire response must be valid JSON and nothing else.`;
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 15000);
-
-  let response;
-  try {
-    response = await fetch("/api/anthropic", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      signal: controller.signal,
-      body: JSON.stringify({
-        max_tokens: 1000,
-        messages: [{ role: "user", content: prompt }],
-        tools: [{ type: "web_search_20250305", name: "web_search" }]
-      })
-    });
-  } finally {
-    clearTimeout(timeout);
-  }
-
-  if (!response.ok) throw new Error('Anthropic API error: ' + response.status);
-  const data = await response.json();
-  if (!data.content || !Array.isArray(data.content)) throw new Error('Unexpected API response shape');
-
-  const text = data.content.filter(b => b.type === "text").map(b => b.text).join("\n");
-  // Extract the first {...} block in case the model adds any stray text
-  // despite instructions, rather than assuming the whole string is clean JSON.
-  const match = text.match(/\{[\s\S]*\}/);
-  if (!match) throw new Error('No JSON object found in response');
-  const parsed = JSON.parse(match[0]);
-
-  if (!parsed.history || !parsed.recentNotes || !parsed.communitySentiment) {
-    throw new Error('Response missing expected keys');
-  }
-  return parsed;
 }

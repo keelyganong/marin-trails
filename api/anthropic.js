@@ -1,21 +1,23 @@
-// Server-side proxy for Anthropic API calls (trail insights, route location
-// labels). Exists because the browser can't call api.anthropic.com directly
-// — Anthropic doesn't send CORS headers for browser origins, by design,
-// since that would mean shipping the API key to every visitor. This
-// function holds the key server-side (ANTHROPIC_API_KEY env var, set in the
-// Vercel project's Settings > Environment Variables) and forwards the
-// request.
+// Server-side proxy for one-off Anthropic API calls — currently just the
+// custom-route location label lookup (js/insights.js fetchRouteLocationLabel).
+// Trail insights have their own dedicated, cached endpoint (api/insights.js)
+// since they're viewed repeatedly by many visitors; this one stays a thin
+// generic pass-through for the low-frequency, per-route case that doesn't
+// benefit from caching (each route has a unique lat/lon).
 //
-// The frontend (js/insights.js) still builds the prompt and parses the
-// response — this stays a thin pass-through, not business logic — but with
-// a few limits so a public, keyless endpoint can't be used to run up an
-// unbounded bill: pinned model, capped max_tokens, and a light per-IP rate
-// limit (best-effort; skipped if no Redis is configured yet).
+// Exists because the browser can't call api.anthropic.com directly —
+// Anthropic doesn't send CORS headers for browser origins, by design, since
+// that would mean shipping the API key to every visitor. This function
+// holds the key server-side (ANTHROPIC_API_KEY env var, set in the Vercel
+// project's Settings > Environment Variables) and forwards the request.
+//
+// A few limits since this is a public, keyless endpoint: pinned model
+// (enforced in lib/anthropic.js), capped max_tokens, and a light per-IP
+// rate limit (best-effort; skipped if no Redis is configured yet).
 
 import { Redis } from '@upstash/redis';
+import { callAnthropic } from '../lib/anthropic.js';
 
-const ALLOWED_MODEL = 'claude-sonnet-4-6';
-const MAX_TOKENS_CAP = 1200;
 const RATE_LIMIT_PER_HOUR = 30;
 
 let redis = null;
@@ -24,7 +26,7 @@ try {
     redis = Redis.fromEnv();
   }
 } catch {
-  redis = null; // storage not configured yet — proxy still works, just unrated-limited
+  redis = null; // storage not configured yet — proxy still works, just unrate-limited
 }
 
 async function checkRateLimit(ip) {
@@ -51,12 +53,6 @@ export default async function handler(req, res) {
     return;
   }
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    res.status(500).json({ error: 'Server is missing ANTHROPIC_API_KEY' });
-    return;
-  }
-
   let body;
   try {
     body = req.body || {};
@@ -70,25 +66,6 @@ export default async function handler(req, res) {
     return;
   }
 
-  try {
-    const upstream = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: ALLOWED_MODEL,
-        max_tokens: Math.min(Number(max_tokens) || 800, MAX_TOKENS_CAP),
-        messages,
-        ...(tools ? { tools } : {}),
-      }),
-    });
-
-    const data = await upstream.json();
-    res.status(upstream.status).json(data);
-  } catch (err) {
-    res.status(502).json({ error: 'Upstream request to Anthropic failed', detail: String(err) });
-  }
+  const result = await callAnthropic({ messages, tools, max_tokens });
+  res.status(result.status).json(result.data);
 }

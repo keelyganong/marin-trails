@@ -126,28 +126,47 @@ it still honestly falls back to "Not measured" rather than guessing.
 
 ## Backend: AI insights + cross-device sync
 
-Two things need more than a static file host: live AI trail insights, and
-syncing custom routes across your own devices. Both need a server holding a
-secret (an API key; a database credential), which a static site can't do.
-This app is deployed on **Vercel**, which serves the static files *and* runs
-two small serverless functions from `api/`:
+Three things need more than a static file host: live trail insights, the
+per-route location label lookup, and syncing custom routes across your own
+devices. All three need a server holding a secret (an API key; a database
+credential), which a static site can't do. This app is deployed on
+**Vercel**, which serves the static files *and* runs small serverless
+functions from `api/` (shared Anthropic-calling logic factored into
+`lib/anthropic.js`):
 
-- **`api/anthropic.js`** — proxies calls to the Anthropic API. The trail
-  history/notes/community-sentiment text originally called
-  `api.anthropic.com` directly from the browser, which worked inside the
-  original chat sandbox (which proxied the call) but **is blocked by CORS in
-  a real browser** — confirmed while testing this rebuild:
+- **`api/insights.js`** — generates a trail's live **recent conditions**
+  and **community sentiment** (closures, season, crowding, what hikers are
+  saying lately), cached per trail in Redis for 24 hours. **History is
+  deliberately not part of this call** — it doesn't change, so it's static
+  content from `data/fallback-insights.js` instead, rendered instantly with
+  no network request at all (`js/insights.js` `renderHistory`). With only 8
+  built-in trails and a 24-hour cache, this bounds real Anthropic calls to
+  at most 8 per day *total*, regardless of how many people are viewing the
+  map — cost doesn't scale with traffic. The sidebar shows an "Updated X
+  ago" timestamp and category tags (closure / seasonal / crowd / conditions
+  / wildlife) on whatever the model actually found — empty categories are
+  simply omitted rather than padded. Custom (`isCustom`) trails skip this
+  call entirely (no public info exists for a route only you've drawn) and
+  show `GENERIC_FALLBACK_INSIGHTS` throughout. Requires Redis (see setup
+  below); without it, returns 503 and the sidebar falls back to the static
+  `recentNotes`/`communitySentiment` text in `data/fallback-insights.js`.
+
+- **`api/anthropic.js`** — a thin, uncached proxy for the one remaining
+  one-off Anthropic call: the custom-route location label lookup
+  (`fetchRouteLocationLabel`), which doesn't benefit from caching since
+  every traced route has a unique lat/lon. All of this exists because the
+  browser can't call `api.anthropic.com` directly — confirmed while testing
+  this rebuild:
   ```
   Access to fetch at 'https://api.anthropic.com/v1/messages' from origin
   'http://localhost:4173' has been blocked by CORS policy
   ```
   Anthropic doesn't send CORS headers for browser origins, by design — that
-  would mean shipping an API key to every visitor. This function holds the
-  key server-side instead. It's a public, keyless endpoint, so it also pins
-  the model, caps `max_tokens`, and rate-limits per IP (30/hour) to bound
-  worst-case cost if it gets hit outside the app. `js/insights.js` calls
-  `/api/anthropic` instead of `api.anthropic.com` directly. Falls back to
-  `data/fallback-insights.js` if the call still fails for any reason.
+  would mean shipping an API key to every visitor. Both `api/anthropic.js`
+  and `api/insights.js` hold the key server-side (`lib/anthropic.js`, which
+  pins the model and caps `max_tokens`); `api/anthropic.js` additionally
+  rate-limits per IP (30/hour) since — unlike `/api/insights` — it isn't
+  bounded by a cache.
 
 - **`api/trails.js`** — stores custom traced trails so they follow you
   across your own devices, keyed by a private "sync code" (`js/storage.js`,
@@ -174,13 +193,15 @@ support browser CORS directly, confirmed working during testing.
    add `ANTHROPIC_API_KEY` with your key. Redeploy after adding it (env var
    changes need a redeploy to take effect).
 
-3. **Add Redis for trail sync.** Project → Storage tab → Browse Marketplace
-   → "Upstash for Redis" (this replaced the old "Vercel KV" product in
-   December 2024 — search for Upstash if you don't see KV listed) → create
-   a database and connect it to this project. Vercel auto-injects the
-   `KV_REST_API_URL`/`KV_REST_API_TOKEN` (or `UPSTASH_REDIS_REST_URL`/
-   `UPSTASH_REDIS_REST_TOKEN`) env vars that `api/trails.js` reads via
-   `Redis.fromEnv()` — no manual copying needed.
+3. **Add Redis** — used by both trail sync (`api/trails.js`) and the
+   insights cache (`api/insights.js`; without it, insights just fall back
+   to static content rather than calling Anthropic uncached). Project →
+   Storage tab → Browse Marketplace → "Upstash for Redis" (this replaced
+   the old "Vercel KV" product in December 2024 — search for Upstash if
+   you don't see KV listed) → create a database and connect it to this
+   project. Vercel auto-injects the `KV_REST_API_URL`/`KV_REST_API_TOKEN`
+   (or `UPSTASH_REDIS_REST_URL`/`UPSTASH_REDIS_REST_TOKEN`) env vars this
+   code reads via `Redis.fromEnv()` — no manual copying needed.
 
 4. **Redeploy** once both are set. That's it — every future `git push` to
    `main` auto-deploys.

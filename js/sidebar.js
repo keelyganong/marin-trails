@@ -51,7 +51,7 @@ async function openSidebar(trail) {
   sheetName.textContent = trail.name;
   renderStats(trail);
   renderFavButton(trail);
-  renderSkeleton();
+  renderHistory(trail); // static — renders immediately, no network call
   document.getElementById('weatherCard').innerHTML = '<div class="skeleton"></div>';
 
   document.getElementById('sheetEditBtn').style.display = trail.isCustom ? 'flex' : 'none';
@@ -75,11 +75,18 @@ async function openSidebar(trail) {
       if (currentTrail && currentTrail.id === trail.id) renderWeatherError();
     });
 
+  if (trail.isCustom) {
+    // No public information exists for a route only you've drawn — skip
+    // the live call entirely rather than send it somewhere with nothing to find.
+    renderStaticFallbackSections(trail);
+    return;
+  }
+
   try {
-    const insights = await fetchInsights(trail);
-    if (currentTrail && currentTrail.id === trail.id) renderInsights(insights);
+    const insights = await fetchLiveInsights(trail.id);
+    if (currentTrail && currentTrail.id === trail.id) renderLiveSections(insights);
   } catch (err) {
-    console.error('Falling back to static insights:', err);
-    if (currentTrail && currentTrail.id === trail.id) renderInsights(FALLBACK_INSIGHTS[trail.id] || GENERIC_FALLBACK_INSIGHTS);
+    console.error('Falling back to static recent/community sections:', err);
+    if (currentTrail && currentTrail.id === trail.id) renderStaticFallbackSections(trail);
   }
 }

@@ -284,6 +284,27 @@
     margin: 0;
   }
 
+  .insight-header {
+    display: flex; align-items: baseline; justify-content: space-between;
+    gap: 8px; margin-bottom: 8px;
+  }
+  .insight-header h3 { margin: 0; }
+  .insight-refresh-label {
+    font-size: 10.5px; font-weight: 600; color: var(--sage);
+    white-space: nowrap; flex-shrink: 0;
+  }
+  .insight-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+  .insight-tag {
+    font-size: 10.5px; font-weight: 700;
+    padding: 3px 9px; border-radius: 999px;
+    background: rgba(61,108,130,0.12); color: var(--bay);
+  }
+  .insight-tag-closure { background: rgba(193,84,46,0.14); color: var(--poppy); }
+  .insight-tag-seasonal { background: rgba(124,143,110,0.18); color: var(--forest); }
+  .insight-tag-crowd { background: rgba(61,108,130,0.12); color: var(--bay); }
+  .insight-tag-conditions { background: rgba(23,31,22,0.08); color: var(--ink); }
+  .insight-tag-wildlife { background: rgba(193,84,46,0.14); color: var(--poppy); }
+
   .skeleton {
     height: 14px; border-radius: 6px;
     background: linear-gradient(90deg, rgba(23,31,22,0.06), rgba(23,31,22,0.12), rgba(23,31,22,0.06));
