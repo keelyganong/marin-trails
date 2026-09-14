@@ -222,6 +222,43 @@ document.addEventListener('mouseup', () => {
   if (dragTraceActive) { dragTraceActive = false; map.dragging.enable(); updateTraceHint(); }
   mouseDownLatLng = null;
 });
+document.addEventListener('touchend', () => {
+  if (dragTraceActive) { dragTraceActive = false; map.dragging.enable(); updateTraceHint(); }
+  mouseDownLatLng = null;
+});
+
+// ----- Touch support -----
+// map.on('mousedown', ...) only ever fires for real mouse events — Leaflet
+// doesn't synthesize it from touch — and Leaflet's own touch handling
+// (pinch-zoom, touch-drag-to-pan) is bound to the same map container a
+// finger drag would use, so without this a phone could either not trace at
+// all or fight the map for the gesture. Native touch listeners on the map
+// container, converted to the same latlng shape the mouse handlers expect,
+// so a touch drag goes through the identical trace/pan logic (including
+// the map.dragging.disable() call that keeps Leaflet's touch-pan out of
+// the way once a trace actually starts).
+function touchToLatLng(touch) {
+  const rect = mapEl.getBoundingClientRect();
+  return map.containerPointToLatLng(L.point(touch.clientX - rect.left, touch.clientY - rect.top));
+}
+
+function handleTraceTouchStart(e) {
+  if (!drawMode || e.touches.length !== 1) return;
+  handleTraceMouseDown({ latlng: touchToLatLng(e.touches[0]) });
+}
+
+function handleTraceTouchMove(e) {
+  if (!dragTraceActive || e.touches.length !== 1) return;
+  e.preventDefault(); // stop the page/map from scrolling while actively tracing
+  handleTraceMouseMove({ latlng: touchToLatLng(e.touches[0]) });
+}
+
+function handleTraceTouchEnd(e) {
+  if (!drawMode) return;
+  const wasTracing = dragTraceActive;
+  handleTraceMouseUp({ latlng: e.changedTouches.length ? touchToLatLng(e.changedTouches[0]) : undefined });
+  if (wasTracing) e.preventDefault();
+}
 
 // ----- Panel phase switching -----
 function showTracingPhase() {
@@ -260,6 +297,9 @@ function enterDrawMode() {
   map.on('mousedown', handleTraceMouseDown);
   map.on('mousemove', handleTraceMouseMove);
   map.on('mouseup', handleTraceMouseUp);
+  mapEl.addEventListener('touchstart', handleTraceTouchStart, { passive: true });
+  mapEl.addEventListener('touchmove', handleTraceTouchMove, { passive: false });
+  mapEl.addEventListener('touchend', handleTraceTouchEnd, { passive: false });
 }
 
 function exitDrawMode(discard) {
@@ -271,6 +311,9 @@ function exitDrawMode(discard) {
   map.off('mousedown', handleTraceMouseDown);
   map.off('mousemove', handleTraceMouseMove);
   map.off('mouseup', handleTraceMouseUp);
+  mapEl.removeEventListener('touchstart', handleTraceTouchStart);
+  mapEl.removeEventListener('touchmove', handleTraceTouchMove);
+  mapEl.removeEventListener('touchend', handleTraceTouchEnd);
   if (discard) {
     if (drawLine) { map.removeLayer(drawLine); map.removeLayer(drawHalo); drawLine = null; drawHalo = null; }
     drawPointMarkers.forEach(m => map.removeLayer(m));

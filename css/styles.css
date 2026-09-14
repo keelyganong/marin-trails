@@ -67,6 +67,20 @@
     display: inline-block;
   }
 
+  /* On a phone, the brand card was eating close to half the screen height
+     (title + full caption + legend + button all stacked at desktop sizing)
+     before there was any map left to look at — tighten the vertical rhythm
+     without dropping the caption entirely, since it's the one-line pitch
+     for what the tool does. */
+  @media (max-width: 480px) {
+    .top-left-stack { top: 10px; left: 10px; }
+    .brand { padding: 8px 14px; max-width: calc(100vw - 130px); }
+    .brand h1 { font-size: 16px; }
+    .brand p { font-size: 10.5px; margin-top: 2px; line-height: 1.3; }
+    .legend { margin-top: 6px; padding-top: 6px; gap: 6px; }
+    .add-trail-btn { margin-top: 6px; padding-top: 8px; }
+  }
+
   .fav-counter {
     position: absolute; top: 18px; right: 18px; z-index: 500;
     background: var(--card);
