@@ -77,7 +77,11 @@
     .brand { padding: 8px 14px; max-width: min(230px, calc(100vw - 175px)); }
     .brand h1 { font-size: 16px; }
     .brand p { font-size: 10.5px; margin-top: 2px; line-height: 1.3; }
-    .legend { margin-top: 6px; padding-top: 6px; gap: 6px; }
+    /* Three legend items in a row don't fit this card's narrower mobile
+       width at their desktop padding/gap — wrap is the safety net if
+       they still don't fit even after tightening, rather than clipping. */
+    .legend { margin-top: 6px; padding-top: 6px; gap: 4px 6px; flex-wrap: wrap; }
+    .legend-item { padding: 3px 5px; font-size: 10px; }
     .add-trail-btn { margin-top: 6px; padding-top: 8px; }
   }
 
